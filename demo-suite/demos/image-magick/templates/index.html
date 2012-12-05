@@ -1,0 +1,39 @@
+{% extends "templates/base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/{{ demo_name }}/css/style.css">
+{% endblock %}
+
+{% block extra_javascript %}
+<script type="text/javascript">
+  var DEMO_NAME = '{{ demo_name }}';
+  var TAG = '{{ tag }}';
+  var BUCKET = '{{ bucket }}';
+  var DIRECTORY = '{{ directory }}';
+</script>
+<script type="text/javascript" src="/js/gce.js"></script>
+<script type="text/javascript" src="/js/squares.js"></script>
+<script type="text/javascript" src="/js/counter.js"></script>
+<script type="text/javascript" src="/{{ demo_name }}/js/script.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1>
+  Welcome to Image Magick!
+</h1>
+
+<p>
+  This demo shows how to store output from instances on Cloud Storage.
+</p>
+
+<p>
+  <a href="/{{ demo_name }}/project">Edit</a> your Compute Engine / Cloud
+  Storage project information.
+</p>
+
+<div>
+  <a class="btn" id="start">Start</a>
+  <a class="btn disabled" id="reset">Reset</a>
+</div>
+<div id="instances"></div>
+{% endblock %}

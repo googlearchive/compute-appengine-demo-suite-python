@@ -1,0 +1,38 @@
+body {
+  padding-top: 60px;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+.span1 {
+  margin-left: 0px;
+  width: 32px;
+}
+
+.color-block {
+  height: 30px;
+  width: 30px;
+  margin: 3px 5px 0 0;
+}
+
+.red {
+  background-color: red;
+}
+
+.orange {
+  background-color: #FF8C00;
+}
+
+.yellow {
+  background-color: #FFD700;
+}
+
+.green {
+  background-color: green;
+}
+
+.grey {
+  background-color: #999999;
+}

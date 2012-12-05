@@ -1,0 +1,26 @@
+h3 {
+  margin-top: 20px;
+}
+
+img {
+  height: 30px;
+  width: 30px;
+}
+
+label {
+  width: 350px;
+  display: block;
+  float: left;
+}
+
+p {
+  clear: left;
+}
+
+#instances {
+  margin-bottom: 20px;
+}
+
+.project {
+  width: 150px;
+}

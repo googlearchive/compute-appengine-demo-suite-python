@@ -1,0 +1,9 @@
+handlers:
+- url: /quick-start/css
+  static_dir: demos/quick-start/static/css
+
+- url: /quick-start/js
+  static_dir: demos/quick-start/static/js
+
+- url: /quick-start.*
+  script: demos.quick-start.main.app

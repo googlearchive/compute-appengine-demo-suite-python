@@ -1,0 +1,31 @@
+{% extends "templates/base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/{{ demo_name }}/css/style.css">
+{% endblock %}
+
+{% block content %}
+<h1>
+  We need some information from you.
+</h1>
+
+<div>
+  <form method="post" id="projects" action='/{{ demo_name }}/project'>
+    {% for parameter in parameters %}
+    <p>
+      <label>
+        {{ parameter.label }}:{% if parameter.required %}*{% endif %}
+      </label>
+      <input type="text" name="{{ parameter.name }}" class="project"
+          value="{{ user_entered[parameter.name] }}">
+    </p>
+    {% endfor %}
+    <p>
+      <button class="btn" type="submit">Submit</button>
+    </p>
+    <p>
+      * Indicates a required field
+    </p>
+  </form>
+</div>
+{% endblock %}

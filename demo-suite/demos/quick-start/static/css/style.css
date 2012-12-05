@@ -1,0 +1,36 @@
+h3 {
+  margin: 20px 0;
+}
+
+img {
+  height: 30px;
+  width: 30px;
+}
+
+label {
+  width: 350px;
+  display: block;
+  float: left;
+}
+
+p {
+  clear: left;
+}
+
+#num-instances {
+  width: 55px;
+  margin-top: 12px;
+  line-height: 18px;
+}
+
+#instances {
+  margin-bottom: 20px;
+}
+
+#elapsed-time {
+  font-size: 25px;
+}
+
+.project {
+  width: 150px;
+}

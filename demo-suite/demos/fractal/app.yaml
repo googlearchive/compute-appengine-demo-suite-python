@@ -1,0 +1,9 @@
+handlers:
+- url: /fractal/css
+  static_dir: demos/fractal/static/css
+
+- url: /fractal/js
+  static_dir: demos/fractal/static/js
+
+- url: /fractal.*
+  script: demos.fractal.main.app

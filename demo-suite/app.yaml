@@ -1,0 +1,39 @@
+application: gce-demos
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+includes:
+- demos/fractal/app.yaml
+- demos/quick-start/app.yaml
+- demos/image-magick/app.yaml
+
+handlers:
+- url: /css
+  static_dir: static/css
+
+- url: /js
+  static_dir: static/js
+
+- url: /bootstrap/js
+  static_dir: static/bootstrap/js
+
+- url: /bootstrap/css
+  static_dir: static/bootstrap/css
+
+- url: /oauth2callback.*
+  script: main.app
+
+- url: /
+  script: main.app
+
+libraries:
+- name: jinja2
+  version: latest
+
+builtins:
+- deferred: on
+
+inbound_services:
+- warmup

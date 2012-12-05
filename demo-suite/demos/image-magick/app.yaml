@@ -1,0 +1,9 @@
+handlers:
+- url: /image-magick/css
+  static_dir: demos/image-magick/static/css
+
+- url: /image-magick/js
+  static_dir: demos/image-magick/static/js
+
+- url: /image-magick.*
+  script: demos.image-magick.main.app

@@ -1,0 +1,28 @@
+{% extends "templates/base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/{{ tag }}/css/style.css">
+{% endblock %}
+
+{% block extra_javascript %}
+<script type="text/javascript">
+  var TAG = '{{ tag }}';
+</script>
+<script type="text/javascript" src="/js/gce.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+<script type="text/javascript" src="/{{ tag }}/js/script.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1>
+  Welcome to Fractal Generator!
+</h1>
+
+<p>
+  This demo creates 2 zoomable fractal images using the Maps API. The one
+  on the left is the 'slower' map, with fewer instances being used to serve
+  tiles than the one on the right.
+</p>
+
+<div id="maps"></div>
+{% endblock %}

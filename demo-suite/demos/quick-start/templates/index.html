@@ -1,0 +1,43 @@
+{% extends "templates/base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/{{ demo_name }}/css/style.css">
+{% endblock %}
+
+{% block extra_javascript %}
+<script type="text/javascript">
+  var DEMO_NAME = '{{ demo_name }}';
+  var TAG = '{{ tag }}';
+</script>
+<script type="text/javascript" src="/js/gce.js"></script>
+<script type="text/javascript" src="/js/squares.js"></script>
+<script type="text/javascript" src="/js/timer.js"></script>
+<script type="text/javascript" src="/js/counter.js"></script>
+<script type="text/javascript" src="/{{ demo_name }}/js/script.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1>
+  Welcome to Quick Start!
+</h1>
+<p>
+  This demo shows just how quick it is to start hundreds of instances.
+</p>
+
+<p>
+  <a href="/{{ demo_name }}/project">Edit</a> your Compute Engine project
+  information.
+</p>
+
+<p>
+  <input type="text" id="num-instances" value="5">
+  <a class="btn" id="start">Start</a>
+  <a class="btn disabled" id="reset">Reset</a>
+</p>
+
+<div>
+  <canvas id="counter"></canvas>
+  <span id="elapsed-time">Timer: <span id="timer"></span></span>
+</div>
+<div id="instances"></div>
+{% endblock %}
