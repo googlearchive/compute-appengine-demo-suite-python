@@ -64,8 +64,6 @@ Add to /lib directory
 - [httplib2-0.7.7][7]
 - [oauth2client-1.0][8]
 
-Add to /static/bootstrap directory
-- [Twitter bootstrap][9]
 
 [1]: https://developers.google.com/appengine/docs/python/config/appconfig#About_app_yaml
 [2]: https://developers.google.com/api-client-library/python/guide/aaa_client_secrets
@@ -75,4 +73,3 @@ Add to /static/bootstrap directory
 [6]: http://code.google.com/p/python-gflags/
 [7]: http://code.google.com/p/httplib2/
 [8]: http://pypi.python.org/pypi/oauth2client/1.0
-[9]: http://twitter.github.com/bootstrap/
