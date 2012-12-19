@@ -14,16 +14,16 @@
    with your client id and secrets, as found in the API console. The file
    should look something like this:
 
-   {<br>
-     "web": {<br>
-       "client_id": "24043....apps.googleusercontent.com",<br>
-       "client_secret": "iPVXC5...xVz",<br>
-       "redirect_uris": ["http://localhost:8080/oauth2callback",<br>
-                         "http://<your-app-id>.appspot.com/oauth2callback"],<br>
-       "auth_uri": "https://accounts.google.com/o/oauth2/auth",<br>
-       "token_uri": "https://accounts.google.com/o/oauth2/token"<br>
-     }<br>
-   }<br>
+   <pre>{
+     "web": {
+       "client_id": "24043....apps.googleusercontent.com",
+       "client_secret": "iPVXC5...xVz",
+       "redirect_uris": ["http://localhost:8080/oauth2callback",
+                         "http://<your-app-id>.appspot.com/oauth2callback"],
+       "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+       "token_uri": "https://accounts.google.com/o/oauth2/token"
+     }
+   }</pre>
 
    Also make sure that the redirect URIs are correctly associated with the
    client id and secret in the API console.
