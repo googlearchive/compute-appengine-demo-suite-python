@@ -23,7 +23,11 @@
        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
        "token_uri": "https://accounts.google.com/o/oauth2/token"
      }
+
    }
+
+   Also make sure that the redirect URIs are correctly associated with the
+   client id and secret in the API console.
 
    More information about client secrets can be found in the
    [API client library documentation][2].
