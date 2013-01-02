@@ -75,6 +75,7 @@ Add to /lib directory
 - [python_gflags-2.0][7]
 - [httplib2-0.7.7][8]
 - [oauth2client-1.0][9]
+- [gcelib][10]
 
 
 [1]: http://gce-demos.appspot.com
@@ -86,3 +87,4 @@ Add to /lib directory
 [7]: http://code.google.com/p/python-gflags/
 [8]: http://code.google.com/p/httplib2/
 [9]: http://pypi.python.org/pypi/oauth2client/1.0
+[10]: https://developers.google.com/compute/docs/gcelib/using
