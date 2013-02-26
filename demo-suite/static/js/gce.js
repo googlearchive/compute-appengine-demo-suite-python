@@ -57,14 +57,6 @@ Gce.prototype.listInstanceUrl_ = null;
 Gce.prototype.stopInstanceUrl_ = null;
 
 /**
- * The heartbeat timeout time in milliseconds.
- * @const
- * @type {number}
- * @private
- */
-Gce.prototype.HEARTBEAT_TIMEOUT_TIME_ = 2000;
-
-/**
  * Sets the GCE UI options. Options include colored squares to indicate
  * status, timer, and counter.
  * @param {Object} gceUiOptions UI options for demos.
@@ -86,20 +78,23 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     }
   }
 
+  var ajaxRequest = {
+    type: 'POST',
+    url: this.startInstanceUrl_,
+    dataType: 'json',
+    statusCode: {
+      401: function(jqXHR, textStatus, errorThrown) {
+        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
+      },
+      500: function(jqXHR, textStatus, errorThrown) {
+        alert('Unknown error: ' + textStatus + ':' + errorThrown);
+      }
+    }
+  };
   if (startOptions.data) {
-    $.ajax({
-      type: 'POST',
-      url: this.startInstanceUrl_,
-      data: startOptions.data,
-      dataType: 'json'
-    });
-  } else {
-    $.ajax({
-      type: 'POST',
-      url: this.startInstanceUrl_,
-      dataType: 'json'
-    });
+    ajaxRequest.data = startOptions.data;
   }
+  $.ajax(ajaxRequest);
   if (this.gceUiOptions || startOptions.callback) {
     this.heartbeat_(numInstances, startOptions.callback);
   }
@@ -113,7 +108,15 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
 Gce.prototype.stopInstances = function(callback) {
   $.ajax({
     type: 'POST',
-    url: this.stopInstanceUrl_
+    url: this.stopInstanceUrl_,
+    statusCode: {
+      401: function(jqXHR, textStatus, errorThrown) {
+        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
+      },
+      500: function(jqXHR, textStatus, errorThrown) {
+        alert('Unknown error: ' + textStatus + ':' + errorThrown);
+      }
+    }
   });
   if (this.gceUiOptions || callback) {
     this.heartbeat_(0, callback);
@@ -124,32 +127,28 @@ Gce.prototype.stopInstances = function(callback) {
  * Check for running instances.
  * @param {function} callback A function to call when AJAX request completes.
  * @param {Object} optionalData Optional data to send with the request.
- * @param {function} optionalError An optional function to call if there is an
- *     error in the AJAX request.
  */
-Gce.prototype.checkIfRunning = function(callback, optionalData, optionalError) {
+Gce.prototype.checkIfRunning = function(callback, optionalData) {
   var that = this;
   var results = function(data) {
     var numRunning = that.numRunning_(data);
     callback(data, numRunning);
   };
-  this.getStatuses_(results, optionalData, optionalError);
+  this.getStatuses_(results, optionalData);
 };
 
 /**
  * Check for instances that are in any state.
  * @param {function} callback A function to call when AJAX request completes.
  * @param {Object} optionalData Optional data to send with the request.
- * @param {function} optionalError An optional function to call if there is an
- *     error in the AJAX request.
  */
-Gce.prototype.checkIfAlive = function(callback, optionalData, optionalError) {
+Gce.prototype.checkIfAlive = function(callback, optionalData) {
   var that = this;
   var results = function(data) {
     var numAlive = that.numAlive_(data);
     callback(data, numAlive);
   };
-  this.getStatuses_(results, optionalData, optionalError);
+  this.getStatuses_(results, optionalData);
 };
 
 /**
@@ -161,6 +160,8 @@ Gce.prototype.checkIfAlive = function(callback, optionalData, optionalError) {
  * @private
  */
 Gce.prototype.heartbeat_ = function(numInstances, callback) {
+  var heartbeatTimeout = (0.018 * numInstances + 2) * 1000;
+
   var that = this;
   var success = function(data) {
     var numRunning = null;
@@ -196,14 +197,14 @@ Gce.prototype.heartbeat_ = function(numInstances, callback) {
     } else {
       setTimeout(function() {
         that.getStatuses_(success);
-      }, that.HEARTBEAT_TIMEOUT_TIME_);
+      }, heartbeatTimeout);
     }
   };
 
   var that = this;
   setTimeout(function() {
     that.getStatuses_(success);
-  }, this.HEARTBEAT_TIMEOUT_TIME_);
+  }, heartbeatTimeout);
 };
 
 /**
@@ -211,34 +212,27 @@ Gce.prototype.heartbeat_ = function(numInstances, callback) {
  * @param {function} success Function to call if request is successful.
  * @param {Object} optionalData Optional data to send with the request. The data
  *     is added as URL parameters.
- * @param {function} error Function to call if request is not successful.
  * @private
  */
-Gce.prototype.getStatuses_ = function(success, optionalData, optionalError) {
-  if (!optionalError) {
-    optionalError = function(jqXHR, textStatus, errorThrown) {
-      alert('Access token expired. Refresh the page to authorize.');
-    };
-  }
-
+Gce.prototype.getStatuses_ = function(success, optionalData) {
+  var ajaxRequest = {
+    type: 'GET',
+    url: this.listInstanceUrl_,
+    dataType: 'json',
+    success: success,
+    statusCode: {
+      401: function(jqXHR, textStatus, errorThrown) {
+        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
+      },
+      500: function(jqXHR, textStatus, errorThrown) {
+        alert('Unknown error: ' + textStatus + ':' + errorThrown);
+      }
+    }
+  };
   if (optionalData) {
-    $.ajax({
-      type: 'GET',
-      url: this.listInstanceUrl_,
-      dataType: 'json',
-      data: optionalData,
-      success: success,
-      error: optionalError
-    });
-  } else {
-    $.ajax({
-      type: 'GET',
-      url: this.listInstanceUrl_,
-      dataType: 'json',
-      success: success,
-      error: optionalError
-    });
+    ajaxRequest.data = optionalData;
   }
+  $.ajax(ajaxRequest);
 };
 
 /**

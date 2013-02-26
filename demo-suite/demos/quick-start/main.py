@@ -19,29 +19,24 @@ from __future__ import with_statement
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
 import json
-import os
-import urllib
 
 import lib_path
-import gc_appengine.gc_oauth as gc_oauth
-import gc_appengine.gce_appengine as gce_appengine
-import gc_appengine.gce_exception as error
+import google_cloud.gce as gce
+import google_cloud.gce_exception as error
+import google_cloud.oauth as oauth
 import jinja2
 import oauth2client.appengine as oauth2client
-import oauth2client.client as client
 import user_data
 import webapp2
 
-from google.appengine.api import urlfetch
 from google.appengine.api import users
 
 DEMO_NAME = 'quick-start'
-VERSION = float(os.environ['CURRENT_VERSION_ID'])
-TAG = '%s-v%s' % (DEMO_NAME, int(round(VERSION)))
 REVOKE_URL = 'https://accounts.google.com/o/oauth2/revoke'
+MAX_RESULTS = 100
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
-oauth_decorator = gc_oauth.decorator
+oauth_decorator = oauth.decorator
 parameters = [
     user_data.DEFAULTS[user_data.GCE_PROJECT_ID]
 ]
@@ -58,7 +53,7 @@ class QuickStart(webapp2.RequestHandler):
 
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
-    variables = {'tag': TAG, 'demo_name': DEMO_NAME}
+    variables = {'demo_name': DEMO_NAME}
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
     self.response.out.write(template.render(variables))
@@ -76,22 +71,25 @@ class Instance(webapp2.RequestHandler):
     """
 
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
-    helper = gce_appengine.GceAppEngineHelper(
-        credentials=oauth_decorator.credentials, instance_tag=DEMO_NAME,
-        default_project_id=gce_project_id)
+    gce_project = gce.GceProject(
+        oauth_decorator.credentials, project_id=gce_project_id)
+
     try:
-      instances = helper.list_instances('status')
-    except error.GcelibError:
-      self.response.set_status(500)
+      instances = gce_project.list_instances(
+            filter='name eq ^%s.*' % DEMO_NAME, maxResults=MAX_RESULTS)
+    except error.GceError, e:
+      self.response.set_status(500, 'Error getting instances: ' + e.message)
       self.response.headers['Content-Type'] = 'application/json'
-      self.response.out.write({'error': 'Error getting instances.'})
       return
-    except client.AccessTokenRefreshError:
-      self.error(401)
-      self.response.out.write('Unauthorized')
+    except error.GceTokenError:
+      self.response.set_status(401, 'Unauthorized.')
+      self.response.headers['Content-Type'] = 'application/json'
       return
 
-    json_instances = json.dumps(instances)
+    instance_dict = {}
+    for instance in instances:
+      instance_dict[instance.name] = {'status': instance.status}
+    json_instances = json.dumps(instance_dict)
     self.response.headers['Content-Type'] = 'application/json'
     self.response.out.write(json_instances)
 
@@ -103,16 +101,23 @@ class Instance(webapp2.RequestHandler):
     user_id = users.get_current_user().user_id()
     credentials = oauth2client.StorageByKeyName(
         oauth2client.CredentialsModel, user_id, 'credentials').get()
-    helper = gce_appengine.GceAppEngineHelper(
-        credentials=credentials, default_project_id=gce_project_id)
+    gce_project = gce.GceProject(credentials, project_id=gce_project_id)
+
     num_instances = int(self.request.get('num_instances'))
-    instances = ['%s-%d' % (TAG, i) for i in range(num_instances)]
+    instances = [gce.Instance('%s-%d' % (DEMO_NAME, i))
+                 for i in range(num_instances)]
+
     try:
-      helper.insert_instances(instances)
-    except client.AccessTokenRefreshError:
-      self.error(401)
-      self.response.out.write('Unauthorized')
+      gce_project.bulk_insert(instances)
+    except error.GceError, e:
+      self.response.set_status(500, 'Error inserting instances: ' + e)
+      self.response.headers['Content-Type'] = 'application/json'
       return
+    except error.GceTokenError:
+      self.response.set_status(401, 'Unauthorized.')
+      self.response.headers['Content-Type'] = 'application/json'
+      return
+
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('starting cluster')
 
@@ -127,10 +132,21 @@ class Cleanup(webapp2.RequestHandler):
     user_id = users.get_current_user().user_id()
     credentials = oauth2client.StorageByKeyName(
         oauth2client.CredentialsModel, user_id, 'credentials').get()
-    helper = gce_appengine.GceAppEngineHelper(
-        credentials=credentials, instance_tag=TAG,
-        default_project_id=gce_project_id)
-    helper.delete_instances()
+    gce_project = gce.GceProject(credentials, project_id=gce_project_id)
+
+    try:
+      instances = gce_project.list_instances(
+            filter='name eq ^%s.*' % DEMO_NAME, maxResults=MAX_RESULTS)
+      gce_project.bulk_delete(instances)
+    except error.GceError, e:
+      self.response.set_status(500, 'Error deleting instances: ' + e.message)
+      self.response.headers['Content-Type'] = 'application/json'
+      return
+    except error.GceTokenError:
+      self.response.set_status(401, 'Unauthorized.')
+      self.response.headers['Content-Type'] = 'application/json'
+      return
+
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('stopping cluster')
 

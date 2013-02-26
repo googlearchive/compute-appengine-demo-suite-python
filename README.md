@@ -51,7 +51,13 @@ instructions.
    More information about Service accounts can be found in the
    [API client library documentation][4].
 
-4. Update the DEFAULT_PROJECT_ID in lib/gc_appengine/gce_appengine.py
+4. The Fractal demo also requires 2 files to be stored on Cloud Storage. Create
+   a bucket on Cloud Storage and upload the image_handler.py and mandelbrot.jar
+   files found in demos > fractal > vm_files to that bucket. Change the
+   path to the files in the Fractal Demo's startup.sh file to point to your
+   Cloud Storage files.
+
+5. Update the DEFAULT_PROJECT_ID in lib/gc_appengine/gce_appengine.py
    with your own project id:
 
    DEFAULT_PROJECT_ID = "your-project-id"
@@ -59,7 +65,7 @@ instructions.
    Information on how to get your Compute Engine project ID can be found
    in the [Compute Engine documentation][5].
 
-5. (optional) You can optionally create custom images for the Fractal and
+6. (optional) You can optionally create custom images for the Fractal and
    Image Magick demos that will allow the instances to start quicker. First, start
    the instances using the demo UI. When at least one of the instances is up
    and running, ssh into that instance and follow the directions [here][6] for
