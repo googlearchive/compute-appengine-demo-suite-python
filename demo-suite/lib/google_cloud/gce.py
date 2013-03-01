@@ -36,6 +36,9 @@ API = 'compute'
 GCE_URL = 'https://www.googleapis.com/%s' % API
 GOOGLE_PROJECT = 'google'
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 class GceProject(object):
   """Gce classes and methods to work with Compute Engine.
@@ -598,6 +601,8 @@ class Firewall(GceResource):
 
   def set_defaults(self):
     """Set any defaults before insert."""
+
+    self.network.gce_project = self.gce_project
 
     if not self.network.name:
       self.network.set_defaults()

@@ -32,6 +32,14 @@ var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
   this.startInstanceUrl_ = startInstanceUrl;
   this.listInstanceUrl_ = listInstanceUrl;
   this.stopInstanceUrl_ = stopInstanceUrl;
+  this.statusCodeResponseFunctions_ = {
+    401: function(jqXHR, textStatus, errorThrown) {
+      alert('Refresh token revoked! ' + textStatus + ':' + errorThrown);
+    },
+    500: function(jqXHR, textStatus, errorThrown) {
+      alert('Unknown error: ' + textStatus + ':' + errorThrown);
+    }
+  };
   this.setOptions(gceUiOptions);
 };
 
@@ -55,6 +63,20 @@ Gce.prototype.listInstanceUrl_ = null;
  * @private
  */
 Gce.prototype.stopInstanceUrl_ = null;
+
+/**
+ * Object mapping Ajax response code to handler.
+ * @type {Object}
+ * private
+ */
+Gce.prototype.statusCodeResponseFunctions_ = null;
+
+/**
+ * Time (ms) between calls to server to check for running instances.
+ * @type {number}
+ * private
+ */
+Gce.prototype.HEARTBEAT_TIMEOUT_ = 2000;
 
 /**
  * Sets the GCE UI options. Options include colored squares to indicate
@@ -82,14 +104,7 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     type: 'POST',
     url: this.startInstanceUrl_,
     dataType: 'json',
-    statusCode: {
-      401: function(jqXHR, textStatus, errorThrown) {
-        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
-      },
-      500: function(jqXHR, textStatus, errorThrown) {
-        alert('Unknown error: ' + textStatus + ':' + errorThrown);
-      }
-    }
+    statusCode: this.statusCodeResponseFunctions_
   };
   if (startOptions.data) {
     ajaxRequest.data = startOptions.data;
@@ -109,14 +124,7 @@ Gce.prototype.stopInstances = function(callback) {
   $.ajax({
     type: 'POST',
     url: this.stopInstanceUrl_,
-    statusCode: {
-      401: function(jqXHR, textStatus, errorThrown) {
-        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
-      },
-      500: function(jqXHR, textStatus, errorThrown) {
-        alert('Unknown error: ' + textStatus + ':' + errorThrown);
-      }
-    }
+    statusCode: this.statusCodeResponseFunctions_
   });
   if (this.gceUiOptions || callback) {
     this.heartbeat_(0, callback);
@@ -160,8 +168,6 @@ Gce.prototype.checkIfAlive = function(callback, optionalData) {
  * @private
  */
 Gce.prototype.heartbeat_ = function(numInstances, callback) {
-  var heartbeatTimeout = (0.018 * numInstances + 2) * 1000;
-
   var that = this;
   var success = function(data) {
     var numRunning = null;
@@ -197,14 +203,14 @@ Gce.prototype.heartbeat_ = function(numInstances, callback) {
     } else {
       setTimeout(function() {
         that.getStatuses_(success);
-      }, heartbeatTimeout);
+      }, that.HEARTBEAT_TIMEOUT_);
     }
   };
 
   var that = this;
   setTimeout(function() {
     that.getStatuses_(success);
-  }, heartbeatTimeout);
+  }, this.HEARTBEAT_TIMEOUT_);
 };
 
 /**
@@ -220,14 +226,7 @@ Gce.prototype.getStatuses_ = function(success, optionalData) {
     url: this.listInstanceUrl_,
     dataType: 'json',
     success: success,
-    statusCode: {
-      401: function(jqXHR, textStatus, errorThrown) {
-        alert('Refresh token expired! ' + textStatus + ':' + errorThrown);
-      },
-      500: function(jqXHR, textStatus, errorThrown) {
-        alert('Unknown error: ' + textStatus + ':' + errorThrown);
-      }
-    }
+    statusCode: this.statusCodeResponseFunctions_
   };
   if (optionalData) {
     ajaxRequest.data = optionalData;

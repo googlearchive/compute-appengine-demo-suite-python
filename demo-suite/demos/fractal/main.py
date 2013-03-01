@@ -71,7 +71,7 @@ class Instance(webapp2.RequestHandler):
     try:
       instances = gce_project.list_instances(filter='name eq ^%s.*' % DEMO_NAME)
     except error.GceError, e:
-      self.response.set_status(500, 'Error inserting instances: ' + e)
+      self.response.set_status(500, 'Error listing instances: ' + e)
       self.response.headers['Content-Type'] = 'application/json'
       return
     except error.GceTokenError:
@@ -82,11 +82,15 @@ class Instance(webapp2.RequestHandler):
     # Convert instance info to dict and check server status.
     instance_dict = {}
     for instance in instances:
-      instance_dict[instance.name] = {'status': instance.status}
+      status = None
+      if instance.status:
+        status = instance.status
+      else:
+        status = 'STAGING'
+      instance_dict[instance.name] = {'status': status}
       ip = None
       for interface in instance.network_interfaces:
         for config in interface.get('accessConfigs', []):
-          logging.info(config)
           if 'natIP' in config:
             ip = config['natIP']
             break
@@ -97,9 +101,7 @@ class Instance(webapp2.RequestHandler):
           result = urlfetch.fetch(url='http://%s/health' % ip, deadline=2)
         except urlfetch.Error:
           instance_dict[instance.name]['status'] = 'STAGING'
-        if result and result.content == 'ok':
-          instance_dict[instance.name]['status'] = 'RUNNING'
-        else:
+        if result and result.content != 'ok':
           instance_dict[instance.name]['status'] = 'STAGING'
         instance_dict[instance.name]['externalIp'] = ip
 
@@ -120,6 +122,7 @@ class Instance(webapp2.RequestHandler):
     # Create the firewall if it doesn't exist.
     firewalls = gce_project.list_firewalls()
     firewall_names = [firewall.name for firewall in firewalls]
+    logging.info(firewall_names)
     if not FIREWALL in firewall_names:
       firewall = gce.Firewall(
           name=FIREWALL,
@@ -162,19 +165,20 @@ class Instance(webapp2.RequestHandler):
       A list of gcelib.Instances.
     """
 
-    return [
-        gce.Instance(
-            name='%s-%d' % (tag, i),
-            image_name=IMAGE,
-            image_project=gce_project.settings['project'],
-            machine_type_name=gce_project.settings[
-                'compute']['machine_type'],
-            tags=[DEMO_NAME],
-            metadata=[{
-                'key': 'startup-script',
-                'value': open(STARTUP_SCRIPT, 'r').read()}],
-            service_accounts=gce_project.settings['cloud_service_account'])
-        for i in range(num_instances)]
+    instance_list = []
+    for i in range(num_instances):
+      instance = gce.Instance(
+          name='%s-%d' % (tag, i),
+          image_name=IMAGE,
+          image_project=gce_project.settings['project'],
+          machine_type_name=gce_project.settings['compute']['machine_type'],
+          tags=[DEMO_NAME],
+          metadata=[{
+              'key': 'startup-script',
+              'value': open(STARTUP_SCRIPT, 'r').read()}],
+          service_accounts=gce_project.settings['cloud_service_account'])
+      instance_list.append(instance)
+    return instance_list
 
 
 app = webapp2.WSGIApplication(
