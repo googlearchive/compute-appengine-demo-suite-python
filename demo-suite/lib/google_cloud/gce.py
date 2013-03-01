@@ -36,9 +36,6 @@ API = 'compute'
 GCE_URL = 'https://www.googleapis.com/%s' % API
 GOOGLE_PROJECT = 'google'
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 
 class GceProject(object):
   """Gce classes and methods to work with Compute Engine.

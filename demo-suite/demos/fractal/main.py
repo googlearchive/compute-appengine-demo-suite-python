@@ -19,7 +19,6 @@ from __future__ import with_statement
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
 import json
-import logging
 import os
 
 import lib_path
@@ -122,7 +121,6 @@ class Instance(webapp2.RequestHandler):
     # Create the firewall if it doesn't exist.
     firewalls = gce_project.list_firewalls()
     firewall_names = [firewall.name for firewall in firewalls]
-    logging.info(firewall_names)
     if not FIREWALL in firewall_names:
       firewall = gce.Firewall(
           name=FIREWALL,

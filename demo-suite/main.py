@@ -28,7 +28,6 @@ from google.appengine.api import users
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 decorator = oauth.decorator
 
-
 class Main(webapp2.RequestHandler):
   """Show the main page."""
 
