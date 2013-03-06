@@ -48,7 +48,8 @@ class GceProject(object):
     service: An apiclient.discovery.Resource object for Compute Engine.
   """
 
-  def __init__(self, credentials, project_id=None, zone_name=None):
+  def __init__(
+      self, credentials, project_id=None, zone_name=None, settings=None):
     """Initializes the GceProject class.
 
     Sets default values for class attributes. See the instance resource for
@@ -60,10 +61,16 @@ class GceProject(object):
       credentials: An oauth2client.client.Credentials object.
       project_id: A string name for the Compute Engine project.
       zone_name: The string name of the zone.
+      settings: A dictionary of GCE settings. These settings will override
+          any settings in the settings.json file. See the settings.json file for
+          key names.
     """
 
-    settings_file = os.path.join(os.path.dirname(__file__), 'settings.json')
+    settings_file = os.path.join(
+        os.path.dirname(__file__), '../../settings.json')
     self.settings = json.loads(open(settings_file, 'r').read())
+    if settings:
+      self.settings.update(settings)
 
     self.gce_url = '%s/%s' % (GCE_URL, self.settings['compute']['api_version'])
 
@@ -93,7 +100,6 @@ class GceProject(object):
     Returns:
       A list of Instance objects.
     """
-
     return self._list(Instance, zone_name=zone_name, **args)
 
   def list_firewalls(self, **args):
@@ -243,8 +249,9 @@ class GceProject(object):
 
     resource.set_defaults()
     params = {'project': self.project_id, 'body': resource.json}
-    if resource.__scope__ == 'zonal':
+    if resource.scope == 'zonal':
       params['zone'] = resource.zone.name
+    logging.info(resource.json)
     return resource.service_resource().insert(**params)
 
   def _list_request(self, resource, zone_name=None, **args):
@@ -261,7 +268,7 @@ class GceProject(object):
     params = {'project': self.project_id}
     if args:
       params.update(args)
-    if resource.__scope__ == 'zonal':
+    if resource.scope == 'zonal':
       if not zone_name:
         zone_name = self.zone_name
       params['zone'] = zone_name
@@ -278,18 +285,9 @@ class GceProject(object):
     """
 
     resource.set_defaults()
-
-    params = {'project': self.project_id}
-    if isinstance(resource, Instance):
-      params['instance'] = resource.name
-    if isinstance(resource, Image):
-      params['image'] = resource.name
-    if isinstance(resource, Firewall):
-      params['firewall'] = resource.name
-
-    if resource.__scope__ == 'zonal':
+    params = {'project': self.project_id, resource.type: resource.name}
+    if resource.scope == 'zonal':
       params['zone'] = resource.zone.name
-
     return resource.service_resource().delete(**params)
 
   def _run_request(self, request):
@@ -350,8 +348,61 @@ class GceProject(object):
 
 
 class GceResource(object):
-  """A GCE resource belonging to a GCE project."""
-  pass
+  """A GCE resource belonging to a GCE project.
+
+  Attributes:
+    type: The string name of the resource type (ex: instance, firewall).
+    scope: The string name of the scope (ex: zonal, global).
+  """
+
+  def __init__(self, type, scope):
+    """Initializes the GceResource class.
+
+    Args:
+      type: The string name of the resource type (ex: instance, firewall).
+      scope: The string name of the scope (ex: zonal, global).
+    """
+
+    self.type = type
+    self.scope = scope
+
+  @property
+  def url(self):
+    """Generate the fully-qualified URL of the resource.
+
+    Returns:
+      The string fully-qualified URL.
+    """
+
+    project_id = None
+    if self.type == 'image':
+      project_id = self.project_id
+    else:
+      project_id = self.gce_project.project_id
+
+    if self.scope == 'zonal':
+      return '%s/projects/%s/zones/%s/%ss/%s' % (
+          self.gce_project.gce_url,
+          project_id,
+          self.zone.name,
+          self.type,
+          self.name)
+
+    if self.scope == 'global':
+      return '%s/projects/%s/global/%ss/%s' % (
+          self.gce_project.gce_url,
+          project_id,
+          self.type,
+          self.name)
+
+  def set_defaults(self):
+    """Set any defaults."""
+
+    if not self.name:
+      if self.type == 'machineType':
+        self.name = self.gce_project.settings['compute']['machine_type']
+      else:
+        self.name = self.gce_project.settings['compute'][self.type]
 
 
 class Instance(GceResource):
@@ -373,15 +424,13 @@ class Instance(GceResource):
         service accounts.
   """
 
-  __scope__ = 'zonal'
-
   def __init__(self,
                name=None,
                zone_name=None,
                description=None,
                tags=None,
                image_name=None,
-               image_project=GOOGLE_PROJECT,
+               image_project_id=GOOGLE_PROJECT,
                machine_type_name=None,
                network_interfaces=None,
                disks=None,
@@ -404,11 +453,13 @@ class Instance(GceResource):
       service_accounts: A list of dictionaries representing the instance's
           service accounts.
     """
+
+    super(Instance, self).__init__('instance', 'zonal')
     self.name = name
     self.zone = Zone(zone_name)
     self.description = description
     self.tags = tags
-    self.image = Image(image_name, image_project)
+    self.image = Image(image_name, image_project_id)
     self.machine_type = MachineType(machine_type_name)
     self.network_interfaces = network_interfaces
     self.disks = disks
@@ -524,8 +575,6 @@ class Firewall(GceResource):
       and open ports.
   """
 
-  __scope__ = 'global'
-
   def __init__(self,
                name=None,
                description=None,
@@ -550,6 +599,7 @@ class Firewall(GceResource):
         and open ports.
     """
 
+    super(Firewall, self).__init__('firewall', 'global')
     self.name = name
     self.description = description
     self.network = Network(network_name)
@@ -632,11 +682,9 @@ class Image(GceResource):
     raw_disk: A dictionary representing the raw disk.
   """
 
-  __scope__ = 'global'
-
   def __init__(self,
                name=None,
-               project=GOOGLE_PROJECT,
+               project_id=GOOGLE_PROJECT,
                description=None,
                source_type=None,
                preferred_kernel=None,
@@ -652,25 +700,13 @@ class Image(GceResource):
       raw_disk: A dictionary representing the raw disk.
     """
 
+    super(Image, self).__init__('image', 'global')
     self.name = name
-    self.project = project
+    self.project_id = project_id
     self.description = description
     self.source_type = source_type
     self.preferred_kernel = preferred_kernel
     self.raw_disk = raw_disk
-
-  @property
-  def url(self):
-    """Generate the fully-qualified image URL of the image.
-
-    Returns:
-      The string fully-qualified image URL.
-    """
-
-    return '%s/projects/%s/global/images/%s' % (
-        self.gce_project.gce_url,
-        self.project,
-        self.name)
 
   @property
   def json(self):
@@ -709,12 +745,6 @@ class Image(GceResource):
     if json_resource.get('rawDisk', None):
       self.raw_disk = json_resource['rawDisk']
 
-  def set_defaults(self):
-    """Set any defaults."""
-
-    if not self.name:
-      self.name = self.gce_project.settings['compute']['image']
-
   def service_resource(self):
     """Return the images method of the apiclient.discovery.Resource object.
 
@@ -732,8 +762,6 @@ class MachineType(GceResource):
     name: The string name of the machine type.
   """
 
-  __scope__ = 'global'
-
   def __init__(self, name=None):
     """Initialize the MachineType class.
 
@@ -741,26 +769,8 @@ class MachineType(GceResource):
       name: The string name of the machine type.
     """
 
+    super(MachineType, self).__init__('machineType', 'global')
     self.name = name
-
-  @property
-  def url(self):
-    """Generate the fully-qualified URL of the machine type.
-
-    Returns:
-      The string fully-qualified machine type URL.
-    """
-
-    return '%s/projects/%s/global/machineTypes/%s' % (
-        self.gce_project.gce_url,
-        self.gce_project.project_id,
-        self.name)
-
-  def set_defaults(self):
-    """Set any defaults."""
-
-    if not self.name:
-      self.name = self.gce_project.settings['compute']['machine_type']
 
   def service_resource(self):
     """Return the machineTypes method of apiclient.discovery.Resource object.
@@ -779,8 +789,6 @@ class Zone(GceResource):
     name: The string name of the zone.
   """
 
-  __scope__ = 'global'
-
   def __init__(self, name=None):
     """Initialize the Zone class.
 
@@ -788,26 +796,8 @@ class Zone(GceResource):
       name: The string name of the zone.
     """
 
+    super(Zone, self).__init__('zone', 'global')
     self.name = name
-
-  @property
-  def url(self):
-    """Generate the fully-qualified URL of the zone.
-
-    Returns:
-      The string fully-qualified zone URL.
-    """
-
-    return '%s/projects/%s/global/zones/%s' % (
-        self.gce_project.gce_url,
-        self.gce_project.project_id,
-        self.name)
-
-  def set_defaults(self):
-    """Set any defaults."""
-
-    if not self.name:
-      self.name = self.gce_project.settings['compute']['zone']
 
   def service_resource(self):
     """Return the zones method of apiclient.discovery.Resource object.
@@ -826,8 +816,6 @@ class Network(GceResource):
     name: The string name of the network.
   """
 
-  __scope__ = 'global'
-
   def __init__(self, name=None):
     """Initialize the Network class.
 
@@ -835,26 +823,8 @@ class Network(GceResource):
       name: The string name of the network.
     """
 
+    super(Network, self).__init__('network', 'global')
     self.name = name
-
-  @property
-  def url(self):
-    """Generate the fully-qualified URL of the network.
-
-    Returns:
-      The string fully-qualified network URL.
-    """
-
-    return '%s/projects/%s/global/networks/%s' % (
-        self.gce_project.gce_url,
-        self.gce_project.project_id,
-        self.name)
-
-  def set_defaults(self):
-    """Set any defaults."""
-
-    if not self.name:
-      self.name = self.gce_project.settings['compute']['network']
 
   def service_resource(self):
     """Return the networks method of apiclient.discovery.Resource object.

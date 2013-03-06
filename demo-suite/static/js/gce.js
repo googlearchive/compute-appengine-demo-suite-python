@@ -37,7 +37,7 @@ var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
       alert('Refresh token revoked! ' + textStatus + ':' + errorThrown);
     },
     500: function(jqXHR, textStatus, errorThrown) {
-      alert('Unknown error: ' + textStatus + ':' + errorThrown);
+      alert('Unknown error! ' + textStatus + ':' + errorThrown);
     }
   };
   this.setOptions(gceUiOptions);

@@ -23,8 +23,7 @@ import os
 
 import lib_path
 import google_cloud.gce as gce
-import google_cloud.gce_exception as error
-import httplib2
+import google_cloud.gce_appengine as gce_appengine
 import jinja2
 import oauth2client.appengine as oauth2appengine
 import webapp2
@@ -66,47 +65,42 @@ class Instance(webapp2.RequestHandler):
 
     credentials = oauth2appengine.AppAssertionCredentials(scope=GCE_SCOPE)
     gce_project = gce.GceProject(credentials=credentials)
-
-    try:
-      instances = gce_project.list_instances(filter='name eq ^%s.*' % DEMO_NAME)
-    except error.GceError, e:
-      self.response.set_status(500, 'Error listing instances: ' + e)
-      self.response.headers['Content-Type'] = 'application/json'
-      return
-    except error.GceTokenError:
-      self.response.set_status(401, 'Unauthorized.')
-      self.response.headers['Content-Type'] = 'application/json'
-      return
+    instances = gce_appengine.GceAppEngine().run_gce_request(
+        self,
+        gce_project.list_instances,
+        'Error listing instances: ',
+        filter='name eq ^%s.*' % DEMO_NAME)
 
     # Convert instance info to dict and check server status.
-    instance_dict = {}
-    for instance in instances:
-      status = None
-      if instance.status:
-        status = instance.status
-      else:
-        status = 'STAGING'
-      instance_dict[instance.name] = {'status': status}
-      ip = None
-      for interface in instance.network_interfaces:
-        for config in interface.get('accessConfigs', []):
-          if 'natIP' in config:
-            ip = config['natIP']
-            break
-        if ip: break
-      if ip:
-        result = None
-        try:
-          result = urlfetch.fetch(url='http://%s/health' % ip, deadline=2)
-        except urlfetch.Error:
-          instance_dict[instance.name]['status'] = 'STAGING'
-        if result and result.content != 'ok':
-          instance_dict[instance.name]['status'] = 'STAGING'
-        instance_dict[instance.name]['externalIp'] = ip
+    if instances:
+      instance_dict = {}
+      for instance in instances:
+        status = None
+        if instance.status:
+          status = instance.status
+        else:
+          status = 'STAGING'
+        instance_dict[instance.name] = {'status': status}
+        ip = None
+        for interface in instance.network_interfaces:
+          for config in interface.get('accessConfigs', []):
+            if 'natIP' in config:
+              ip = config['natIP']
+              break
+          if ip: break
+        if ip:
+          result = None
+          try:
+            result = urlfetch.fetch(url='http://%s/health' % ip, deadline=2)
+          except urlfetch.Error:
+            instance_dict[instance.name]['status'] = 'STAGING'
+          if result and result.content != 'ok':
+            instance_dict[instance.name]['status'] = 'STAGING'
+          instance_dict[instance.name]['externalIp'] = ip
 
-    json_instances = json.dumps(instance_dict)
-    self.response.headers['Content-Type'] = 'application/json'
-    self.response.out.write(json_instances)
+      json_instances = json.dumps(instance_dict)
+      self.response.headers['Content-Type'] = 'application/json'
+      self.response.out.write(json_instances)
 
   def post(self):
     """Start instances with the given startup script.
@@ -139,17 +133,11 @@ class Instance(webapp2.RequestHandler):
         gce_project, num_fast_map_instances, fast_map_instance_tag)
     instances = slow_map_instances + fast_map_instances
 
-    # Insert the instances.
-    try:
-      gce_project.bulk_insert(instances)
-    except error.GceError, e:
-      self.response.set_status(500, 'Error inserting instances: ' + e)
-      self.response.headers['Content-Type'] = 'application/json'
-      return
-    except error.GceTokenError:
-      self.response.set_status(401, 'Unauthorized.')
-      self.response.headers['Content-Type'] = 'application/json'
-      return
+    gce_appengine.GceAppEngine().run_gce_request(
+        self,
+        gce_project.bulk_insert,
+        'Error inserting instances: ',
+        resources=instances)
 
   def _get_instance_list(self, gce_project, num_instances, tag):
     """Get a list of instances to start.
