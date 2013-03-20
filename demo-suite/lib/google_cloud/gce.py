@@ -251,7 +251,6 @@ class GceProject(object):
     params = {'project': self.project_id, 'body': resource.json}
     if resource.scope == 'zonal':
       params['zone'] = resource.zone.name
-    logging.info(resource.json)
     return resource.service_resource().insert(**params)
 
   def _list_request(self, resource, zone_name=None, **args):
@@ -307,16 +306,22 @@ class GceProject(object):
     result = {}
     try:
       result = request.execute()
-    except api_errors.HttpError, e:
-      logging.error(e)
-      raise error.GceError(
-          'HttpError: %s %s' % (e.resp.status, e.resp.reason))
     except httplib2.HttpLib2Error, e:
       logging.error(e)
       raise error.GceError('Transport Error occurred')
     except client.AccessTokenRefreshError, e:
       logging.error(e)
       raise error.GceTokenError('Access Token refresh error')
+    except api_errors.BatchError, e:
+      logging.error(e)
+      logging.error('BatchError: %s %s' % (e.resp.status, e.content))
+      if e.resp.status != 200:
+        raise error.GceError(
+            'Batch Error: %s %s' % (e.resp.status, e.resp.reason))
+    except api_errors.HttpError, e:
+      logging.error(e)
+      raise error.GceError(
+          'HttpError: %s %s' % (e.resp.status, e.resp.reason))
     return result
 
   def _batch_response(self, request_id, response, exception):
@@ -331,6 +336,7 @@ class GceProject(object):
 
     if exception is not None:
       logging.error(exception)
+      logging.error('API Request Error! ' + response)
 
   def _auth_http(self, credentials):
     """Authorize an instance of httplib2.Http using credentials.
