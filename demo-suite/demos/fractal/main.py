@@ -37,7 +37,6 @@ IMAGE = 'fractal-demo-image'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
-VM_SCOPES = ['https://www.googleapis.com/auth/devstorage.full_control']
 STARTUP_SCRIPT = os.path.join(os.path.dirname(__file__), 'startup.sh')
 
 
@@ -88,6 +87,9 @@ class Instance(webapp2.RequestHandler):
               ip = config['natIP']
               break
           if ip: break
+
+        # Ping the instance server. If result is 'ok', set status to
+        # RUNNING. Otherwise, set to STAGING.
         if ip:
           result = None
           try:

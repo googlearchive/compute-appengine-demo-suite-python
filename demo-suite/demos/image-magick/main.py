@@ -38,7 +38,6 @@ IMAGE = 'image-magick-demo-image'
 IMAGES = ['android', 'appengine', 'apps', 'chrome', 'games', 'gplus',
           'maps', 'wallet', 'youtube']
 SEQUENCES = ['5 5 360', '355 -5 0']
-DEFAULT_SCOPES = ['https://www.googleapis.com/auth/devstorage.full_control']
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator

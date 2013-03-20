@@ -30,8 +30,6 @@ import webapp2
 from google.appengine.api import users
 
 DEMO_NAME = 'quick-start'
-REVOKE_URL = 'https://accounts.google.com/o/oauth2/revoke'
-MAX_RESULTS = 100
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
