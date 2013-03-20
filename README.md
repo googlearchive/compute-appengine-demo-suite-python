@@ -57,23 +57,26 @@ instructions.
    Change the path to the files in the Fractal Demo's startup.sh file to point
    to your Cloud Storage files.
 
-5. Update the DEFAULT_PROJECT_ID in lib/gc_appengine/gce_appengine.py
-   with your own project id:
+5. Update the project value in the settings.json file with your own project id:
 
-   DEFAULT_PROJECT_ID = "your-project-id"
+   "project": "your-project-id",
 
    Information on how to get your Compute Engine project ID can be found
    in the [Compute Engine documentation][6].
 
-6. (optional) You can optionally create custom images for the Fractal and
-   Image Magick demos that will allow the instances to start quicker. First, start
-   the instances using the demo UI. When at least one of the instances is up
-   and running, ssh into that instance and follow the directions [here][7] for
-   creating an image for an instance.
+6. (optional) Update any of the other defaults in the settings.json to
+   match your preferences.
 
-   Name the images 'fractal-demo-image' and 'image-magick-demo-image' respectively.
+7. (optional) You can optionally create custom images for the Fractal and
+   Image Magick demos that will allow the instances to start quicker. First,
+   start the instances using the demo UI. When at least one of the instances
+   is up and running, ssh into that instance and follow the directions
+   [here][7] for creating an image for an instance.
 
-6. Install dependencies listed in the dependencies section.
+   Name the images 'fractal-demo-image' and 'image-magick-demo-image'
+   respectively.
+
+8. Install dependencies listed in the dependencies section.
 
 ## Dependencies
 
