@@ -5,3 +5,21 @@ A list of project to-dos:
 
 - Better map zooming - currently, the left map controls both maps. Both maps
   should have the same control.
+
+- Add mandelbrot source code to fractal demo.
+
+- Quick start demo:
+
+  - Make sure the user can't start more instances that what are available.
+
+  - Add a legend.
+
+  - Click on boxes to show information about the instance.
+
+  - Resize squares based on the number of instances.
+
+  - Gray out reset button when clicked.
+
+  - Don't allow TERMINATED instances to add to the counter's count.
+
+  - When the page loads, show the current state of the world.
