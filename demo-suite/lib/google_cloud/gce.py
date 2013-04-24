@@ -506,7 +506,7 @@ class Instance(GceResource):
     """
 
     self.name = json_resource['name']
-    self.zone_namezone = Zone(json_resource['zone'].split('/')[-1])
+    self.zone_name = Zone(json_resource['zone'].split('/')[-1])
     self.image = Image(json_resource['image'].split('/')[-1])
     self.machine_type = MachineType(json_resource['machineType'].split('/')[-1])
     self.network_interfaces = json_resource['networkInterfaces']
