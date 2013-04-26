@@ -348,7 +348,7 @@ class GceProject(object):
       An authorized instance of httplib2.Http.
     """
 
-    http = httplib2.Http()
+    http = httplib2.Http(timeout=30)
     auth_http = credentials.authorize(http)
     return auth_http
 
