@@ -6,10 +6,30 @@
  */
 
 $(document).ready(function() {
+  $('.btn').button();
   var mapsContainer = document.getElementById('maps');
   var fractal = new Fractal(mapsContainer);
+  configSpinner();
   fractal.initialize();
 });
+
+/**
+ * Configure spinner to show when there is an outstanding Ajax request.
+ *
+ * This really helps to show that something is going on.  It is the 
+ * simplest blinking light that we can add.
+ */
+function configSpinner() {
+  $('#spinner')
+    .css('visibility', 'hidden')
+    .ajaxStart(function() {
+        $('#spinner').css('visibility', '');
+    })
+    .ajaxStop(function() {
+        $('#spinner').css('visibility', 'hidden');
+    })
+  ;
+}
 
 /**
  * Fractal class.
@@ -76,30 +96,58 @@ Fractal.prototype.LONGITUDE_ = -179.6;
  */
 Fractal.prototype.initialize = function() {
   // TAG is set in the index.html template file.
-  var gce = new Gce('/' + TAG + '/instance',
+  this.gce = new Gce('/' + TAG + '/instance',
       '/' + TAG + '/instance',
       '/' + TAG + '/cleanup');
 
   var that = this;
-  gce.checkIfRunning(function(data, numRunning) {
-    var total = that.NUM_SLOW_MAP_INSTANCES_ + that.NUM_FAST_MAP_INSTANCES_;
-    if (numRunning == total) {
+  $('#start').click(function() {
+    that.gce.checkIfRunning(function(data, numRunning) {
+      var total = that.NUM_SLOW_MAP_INSTANCES_ + that.NUM_FAST_MAP_INSTANCES_;
+      if (numRunning == total) {
+        that.mapIt_(data);
+      } else {
+        that.startInstances_()
+      }
+    })
+  })
+  
+  $('#reset').click(function() {
+    that.stopMap_()
+    that.gce.stopInstances()
+  })
+}
+
+Fractal.prototype.startInstances_ = function() {
+  var total = this.NUM_SLOW_MAP_INSTANCES_ + this.NUM_FAST_MAP_INSTANCES_;
+  var that = this
+  this.gce.startInstances(total, {
+    data: {
+      'num_slow_map_instances': that.NUM_SLOW_MAP_INSTANCES_,
+      'slow_map_instance_tag': TAG + that.SLOW_MAP_INSTANCE_TAG_,
+      'num_fast_map_instances': that.NUM_FAST_MAP_INSTANCES_,
+      'fast_map_instance_tag': TAG + that.FAST_MAP_INSTANCE_TAG_
+    },
+    callback: function(data) {
       that.mapIt_(data);
-    } else {
-      gce.startInstances(total, {
-        data: {
-          'num_slow_map_instances': that.NUM_SLOW_MAP_INSTANCES_,
-          'slow_map_instance_tag': TAG + that.SLOW_MAP_INSTANCE_TAG_,
-          'num_fast_map_instances': that.NUM_FAST_MAP_INSTANCES_,
-          'fast_map_instance_tag': TAG + that.FAST_MAP_INSTANCE_TAG_
-        },
-        callback: function(data) {
-          that.mapIt_(data);
-        }
-      });
     }
-  });
-};
+  })
+}
+
+/**
+ * Try to cleanup/delete any running map
+ */
+Fractal.prototype.stopMap_ = function() {
+  if (this.slowMap) {
+    this.slowMap.unbindAll()
+    delete this.slowMap
+  }
+  if (this.fastMap) {
+    this.fastMap.unbindAll()
+    delete this.fastMap
+  }
+  $(this.mapsContainer_).empty()  
+}
 
 /**
  * Get external IPs, create maps, add listeners to maps.
@@ -107,12 +155,13 @@ Fractal.prototype.initialize = function() {
  * @private
  */
 Fractal.prototype.mapIt_ = function(data) {
+  this.stopMap_();
   var ips = this.getIps_(data);
-  var slowMap = this.prepMap_(
+  this.slowMap = this.prepMap_(
       ips['slow_map_ips'], 30, 9, 256);
-  var fastMap = this.prepMap_(
+  this.fastMap = this.prepMap_(
       ips['fast_map_ips'], 30, 9, 256);
-  this.addListeners_(slowMap, fastMap);
+  this.addListeners_(this.slowMap, this.fastMap);
 };
 
 /**

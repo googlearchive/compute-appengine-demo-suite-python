@@ -77,7 +77,9 @@ class Instance(webapp2.RequestHandler):
 
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
     gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
-    gce_project = gce.GceProject(oauth_decorator.credentials, project_id=gce_project_id, zone_name=gce_zone_name)
+    gce_project = gce.GceProject(oauth_decorator.credentials,
+                                 project_id=gce_project_id,
+                                 zone_name=gce_zone_name)
     instances = gce_appengine.GceAppEngine().run_gce_request(
         self,
         gce_project.list_instances,
@@ -129,7 +131,9 @@ class Instance(webapp2.RequestHandler):
 
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
     gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
-    gce_project = gce.GceProject(oauth_decorator.credentials, project_id=gce_project_id, zone_name=gce_zone_name)
+    gce_project = gce.GceProject(oauth_decorator.credentials,
+                                 project_id=gce_project_id,
+                                 zone_name=gce_zone_name)
 
     # Create the firewall if it doesn't exist.
     firewalls = gce_project.list_firewalls()
@@ -148,11 +152,13 @@ class Instance(webapp2.RequestHandler):
     num_slow_map_instances = int(self.request.get('num_slow_map_instances'))
     slow_map_instance_tag = self.request.get('slow_map_instance_tag')
     slow_map_instances = self._get_instance_list(
-        gce_project, num_slow_map_instances, slow_map_instance_tag, custom_image)
+        gce_project, num_slow_map_instances, 
+        slow_map_instance_tag, custom_image)
     num_fast_map_instances = int(self.request.get('num_fast_map_instances'))
     fast_map_instance_tag = self.request.get('fast_map_instance_tag')
     fast_map_instances = self._get_instance_list(
-        gce_project, num_fast_map_instances, fast_map_instance_tag, custom_image)
+        gce_project, num_fast_map_instances, 
+        fast_map_instance_tag, custom_image)
     instances = slow_map_instances + fast_map_instances
 
     gce_appengine.GceAppEngine().run_gce_request(
@@ -204,9 +210,26 @@ class Instance(webapp2.RequestHandler):
     return instance_list
 
 
+class Cleanup(webapp2.RequestHandler):
+  """Stop instances."""
+
+  @oauth_decorator.oauth_required
+  @data_handler.data_required
+  def post(self):
+    """Stop instances using the gce_appengine helper class."""
+    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
+    gce_project = gce.GceProject(oauth_decorator.credentials,       
+                                 project_id=gce_project_id,
+                                 zone_name=gce_zone_name)
+    gce_appengine.GceAppEngine().delete_demo_instances(
+        self, gce_project, DEMO_NAME)
+
+
 app = webapp2.WSGIApplication(
     [
         ('/%s' % DEMO_NAME, Fractal),
         ('/%s/instance' % DEMO_NAME, Instance),
+        ('/%s/cleanup' % DEMO_NAME, Cleanup),
         (data_handler.url_path, data_handler.data_handler),
     ], debug=True)

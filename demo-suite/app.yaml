@@ -16,11 +16,8 @@ handlers:
 - url: /js
   static_dir: static/js
 
-- url: /bootstrap/js
-  static_dir: static/bootstrap/js
-
-- url: /bootstrap/css
-  static_dir: static/bootstrap/css
+- url: /bootstrap
+  static_dir: static/bootstrap
 
 - url: /oauth2callback.*
   script: main.app
