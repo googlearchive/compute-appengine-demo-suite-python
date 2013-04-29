@@ -92,6 +92,12 @@ Add to `ext_lib` directory:
 - [oauth2client-1.0][10]
 - [google-api-python-client][11]
 
+When adding new dependencies do the following:
+
+1. Add them to the list here
+2. Add them to the `download_dependencies.sh` script.
+3. Add them to `demo-suite/lib_path.py`
+
 
 [1]: http://gce-demos.appspot.com
 [2]: https://developers.google.com/appengine/docs/python/config/appconfig#About_app_yaml

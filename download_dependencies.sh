@@ -1,5 +1,4 @@
 #! /bin/bash
-#set -o verbose
 set -o xtrace
 set -o errexit
 
@@ -12,16 +11,16 @@ rm -rf temp_download || true
 mkdir temp_download
 cd temp_download
 
-curl -O https://pypi.python.org/packages/source/p/python-gflags/python-gflags-2.0.tar.gz
+curl -O https://python-gflags.googlecode.com/files/python-gflags-2.0.tar.gz
 tar -C ../demo-suite/ext_lib/ -xzf python-gflags-2.0.tar.gz
 
-curl -O https://pypi.python.org/packages/source/h/httplib2/httplib2-0.8.tar.gz
+curl -O https://httplib2.googlecode.com/files/httplib2-0.8.tar.gz
 tar -C ../demo-suite/ext_lib/ -xzf httplib2-0.8.tar.gz
 
-curl -O https://pypi.python.org/packages/source/o/oauth2client/oauth2client-1.0.tar.gz
+curl -O https://google-api-python-client.googlecode.com/files/oauth2client-1.0.tar.gz
 tar -C ../demo-suite/ext_lib/ -xzf oauth2client-1.0.tar.gz
 
-curl -O https://pypi.python.org/packages/source/g/google-api-python-client/google-api-python-client-1.1.tar.gz
+curl -O https://google-api-python-client.googlecode.com/files/google-api-python-client-1.1.tar.gz
 tar -C ../demo-suite/ext_lib/ -xzf google-api-python-client-1.1.tar.gz
 
 # Clean up after ourselves
