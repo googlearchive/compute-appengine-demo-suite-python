@@ -26,9 +26,10 @@
  * @param {string} listInstanceUrl The URL to list instances.
  * @param {string} stopInstanceUrl The URL to stop instances.
  * @param {Object} gceUiOptions UI options for GCE.
+ * @param {Object} commonQueryData Common parameters to pass with each request.
  */
 var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
-    gceUiOptions) {
+    gceUiOptions, commonQueryData) {
   this.startInstanceUrl_ = startInstanceUrl;
   this.listInstanceUrl_ = listInstanceUrl;
   this.stopInstanceUrl_ = stopInstanceUrl;
@@ -40,6 +41,7 @@ var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
       alert('Unknown error! ' + textStatus + ':' + errorThrown);
     }
   };
+  this.commonQueryData_ = commonQueryData;
   this.setOptions(gceUiOptions);
 };
 
@@ -106,8 +108,12 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     dataType: 'json',
     statusCode: this.statusCodeResponseFunctions_
   };
+  ajaxRequest.data = {}
   if (startOptions.data) {
     ajaxRequest.data = startOptions.data;
+  }
+  if (this.commonQueryData_) {
+    $.extend(ajaxRequest.data, this.commonQueryData_)
   }
   $.ajax(ajaxRequest);
   if (this.gceUiOptions || startOptions.callback) {
@@ -121,10 +127,16 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
  *     have stopped.
  */
 Gce.prototype.stopInstances = function(callback) {
+  var data = {}
+  if (this.commonQueryData_) {
+    $.extend(data, this.commonQueryData_)
+  }
+
   $.ajax({
     type: 'POST',
     url: this.stopInstanceUrl_,
-    statusCode: this.statusCodeResponseFunctions_
+    statusCode: this.statusCodeResponseFunctions_,
+    data: data
   });
   if (this.gceUiOptions || callback) {
     this.heartbeat_(0, callback);
@@ -159,6 +171,25 @@ Gce.prototype.checkIfAlive = function(callback, optionalData) {
   this.getStatuses_(results, optionalData);
 };
 
+
+/**
+ * Send UI update messages when we get data on what is running and how.
+ * @param {Object} data Data returned from GCE API formatted in a dictionary
+ *  mapping instance name to a dictionary of instance information.
+ * @private
+ */
+Gce.prototype.updateUI_ = function(data) {
+    for (var gceUi in this.gceUiOptions) {
+      if (this.gceUiOptions[gceUi].update) {
+        this.gceUiOptions[gceUi].update({
+          'numRunning': this.numRunning_(data),
+          'numAlive': this.numAlive_(data),
+          'data': data
+        });
+      }
+    }
+};
+
 /**
  * Send the Ajax request to start instances. Update UI controls with an update
  * method.
@@ -170,27 +201,16 @@ Gce.prototype.checkIfAlive = function(callback, optionalData) {
 Gce.prototype.heartbeat_ = function(numInstances, callback) {
   var that = this;
   var success = function(data) {
-    var numRunning = null;
-
     // If doing a shutdown (numInstances == 0), check the
     // number alive rather than the number running. We want
     // them all completely shutdown.
     if (numInstances) {
-      numRunning = that.numRunning_(data);
+      isDone = that.numRunning_(data) == numInstances;
     } else {
-      numRunning = that.numAlive_(data);
+      isDone = that.numAlive_(data) == 0;
     }
 
-    for (var gceUi in that.gceUiOptions) {
-      if (that.gceUiOptions[gceUi].update) {
-        that.gceUiOptions[gceUi].update({
-          'numRunning': numRunning,
-          'data': data
-        });
-      }
-    }
-
-    if (numRunning == numInstances) {
+    if (isDone) {
       for (var gceUi in that.gceUiOptions) {
         if (that.gceUiOptions[gceUi].stop) {
           that.gceUiOptions[gceUi].stop();
@@ -221,15 +241,25 @@ Gce.prototype.heartbeat_ = function(numInstances, callback) {
  * @private
  */
 Gce.prototype.getStatuses_ = function(success, optionalData) {
+  var that = this;
+  var localSuccess = function(data) {
+    that.updateUI_(data);
+    success(data);
+  }
+
   var ajaxRequest = {
     type: 'GET',
     url: this.listInstanceUrl_,
     dataType: 'json',
-    success: success,
+    success: localSuccess,
     statusCode: this.statusCodeResponseFunctions_
   };
+  ajaxRequest.data = {}
   if (optionalData) {
     ajaxRequest.data = optionalData;
+  }
+  if (this.commonQueryData_) {
+    $.extend(ajaxRequest.data, this.commonQueryData_)
   }
   $.ajax(ajaxRequest);
 };
