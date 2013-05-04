@@ -141,7 +141,7 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    * The other Fractal instance to sync our zoom/position to.
    * @type {Fractal}
    */
-  this.slave_fractal_ = slave_fractal
+  this.slave_fractal_ = slave_fractal;
 };
 
 /**
@@ -149,14 +149,14 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
  * @type {number}
  * @private
  */
-Fractal.prototype.LATITUDE_ = 85;
+Fractal.prototype.LATITUDE_ = 1.75;
 
 /**
  * The map center longitude.
  * @type {number}
  * @private
  */
-Fractal.prototype.LONGITUDE_ = -179.6;
+Fractal.prototype.LONGITUDE_ = 15;
 
 /**
  * Initialize the UI and check if there are instances already up.
@@ -179,7 +179,7 @@ Fractal.prototype.initialize = function() {
 
   this.squares_ = new Squares(
       squaresContainer.get(0), instanceNames, {
-        cols: 16
+        cols: 8
       });
   this.squares_.drawSquares();
 
@@ -200,7 +200,7 @@ Fractal.prototype.initialize = function() {
 Fractal.prototype.checkRunning = function() {
   var that = this;
   that.gce_.checkIfRunning(function(data, numRunning) {
-    if (numRunning == that.num_instances_) {
+    if (numRunning >= that.num_instances_) {
       that.mapIt_(data);
     }
   });
@@ -265,7 +265,7 @@ Fractal.prototype.stopMap_ = function() {
 Fractal.prototype.mapIt_ = function(data) {
   this.stopMap_();
   var ips = this.getIps_(data);
-  this.map = this.prepMap_(ips, 30, 9, 256);
+  this.map = this.prepMap_(ips, 25, 1, 256);
   this.addListeners_();
 };
 
@@ -285,13 +285,13 @@ Fractal.prototype.prepMap_ = function(ips, maxZoom, minZoom, tileSize) {
     getTileUrl: function(coord, zoom) {
       var url = ['http://'];
       if (ips.length > 1) {
-        var ip = (coord.x * Math.sqrt(numInstances) + coord.y) % numInstances;
-        ip = ip >= 0 ? ip : ip + numInstances - 1;
-        url.push(ips[ip]);
+        var instanceIdx = Math.abs(coord.x + (4 * coord.y)) % numInstances;
+        // var instanceIdx = Math.abs(Math.round(coord.x * Math.sqrt(numInstances) + coord.y)) % numInstances;
+        url.push(ips[instanceIdx]);
       } else {
         url.push(ips[0]);
       }
-      url.push('/tile?zoom=');
+      url.push('/tile?z=');
       url.push(zoom);
       url.push('&x=');
       url.push(coord.x);
@@ -366,7 +366,7 @@ Fractal.prototype.drawMap_ = function(canvas, fractalTypeOptions, mapTypeId) {
 
   var mapOptions = {
     center: new google.maps.LatLng(this.LATITUDE_, this.LONGITUDE_),
-    zoom: 9,
+    zoom: 1,
     streetViewControl: false,
     mapTypeControlOptions: {
       mapTypeIds: [mapTypeId]

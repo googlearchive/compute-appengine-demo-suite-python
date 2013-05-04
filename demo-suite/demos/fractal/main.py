@@ -35,10 +35,15 @@ from google.appengine.api import urlfetch
 
 DEMO_NAME = 'fractal'
 IMAGE = 'fractal-demo-image'
+MACHINE_TYPE='n1-highcpu-4'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
-STARTUP_SCRIPT = os.path.join(os.path.dirname(__file__), 'startup.sh')
+
+VM_FILES = os.path.join(os.path.dirname(__file__), 'vm_files')
+STARTUP_SCRIPT = os.path.join(VM_FILES, 'startup.sh')
+GO_PROGRAM = os.path.join(VM_FILES, 'mandelbrot.go')
+GO_ARGS = '--portBase=80 --numPorts=1'
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -121,11 +126,17 @@ class Instance(RequestHandler):
         if ip and instance.status == 'RUNNING':
           result = None
           try:
+            logging.debug('Health checking %s', ip)
             result = urlfetch.fetch(url='http://%s/health' % ip, deadline=2)
           except urlfetch.Error:
+            logging.debug('%s unhealthy', ip)
             instance_record['status'] = 'STAGING'
-          if result and result.content != 'ok':
+          if result and result.content.strip() != 'ok':
+            logging.debug('%s unhealthy.  Content: %s', ip, result.content)
             instance_record['status'] = 'STAGING'
+          else:
+            logging.debug('%s healthy!', ip)
+
 
     json_instances = json.dumps(instance_dict)
     self.response.headers['Content-Type'] = 'application/json'
@@ -178,6 +189,26 @@ class Instance(RequestHandler):
     images = gce_project.list_images(filter='name eq ^%s-$' % IMAGE)
     return bool(images)
 
+  def _get_instance_metadata(self):
+    """The metadata values to pass into the instance."""
+    inline_values = {
+      'goargs': GO_ARGS,
+    }
+
+    file_values = {
+      'startup-script': STARTUP_SCRIPT,
+      'goprog': GO_PROGRAM,
+    }
+
+    metadata = []
+    for k, v in inline_values.items():
+      metadata.append({'key': k, 'value': v})
+
+    for k, fv in file_values.items():
+      v = open(fv, 'r').read()
+      metadata.append({'key': k, 'value': v})
+    return metadata
+
   def _get_instance_list(self, gce_project, num_instances, custom_image):
     """Get a list of instances to start.
 
@@ -187,7 +218,7 @@ class Instance(RequestHandler):
       custom_image: boolean if we should use a custom image
 
     Returns:
-      A list of gcelib.Instances.
+      A list of gce.Instances.
     """
 
     image_name = None
@@ -200,12 +231,11 @@ class Instance(RequestHandler):
     for i in range(num_instances):
       instance = gce.Instance(
           name='%s-%02d' % (self.InstancePrefix(), i),
+          machine_type_name=MACHINE_TYPE,
           image_name=image_name,
           image_project_id=image_project_id,
           tags=[DEMO_NAME],
-          metadata=[{
-              'key': 'startup-script',
-              'value': open(STARTUP_SCRIPT, 'r').read()}],
+          metadata=self._get_instance_metadata(),
           service_accounts=gce_project.settings['cloud_service_account'])
       instance_list.append(instance)
     return instance_list
