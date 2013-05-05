@@ -122,21 +122,21 @@ class Instance(RequestHandler):
           if ip: break
 
         # Ping the instance server. If result is 'ok', set status to
-        # RUNNING. Otherwise, set to STAGING.
+        # SERVING.
         if ip and instance.status == 'RUNNING':
           result = None
           try:
             logging.debug('Health checking %s', ip)
-            result = urlfetch.fetch(url='http://%s/health' % ip, deadline=2)
+            result = urlfetch.fetch(url='http://%s/health' % ip, deadline=1)
+            if result and result.content.strip() == 'ok':
+              logging.debug('%s healthy!', ip)
+              instance_record['status'] = 'SERVING'
+            else:
+              logging.debug('%s unhealthy.  Content: %s', ip, result.content)
           except urlfetch.Error:
             logging.debug('%s unhealthy', ip)
-            instance_record['status'] = 'STAGING'
-          if result and result.content.strip() != 'ok':
-            logging.debug('%s unhealthy.  Content: %s', ip, result.content)
-            instance_record['status'] = 'STAGING'
-          else:
-            logging.debug('%s healthy!', ip)
 
+        logging.debug('Instance data: %s: %s', instance.name, instance_record)
 
     json_instances = json.dumps(instance_dict)
     self.response.headers['Content-Type'] = 'application/json'

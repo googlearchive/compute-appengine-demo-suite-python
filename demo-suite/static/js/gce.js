@@ -30,9 +30,33 @@
  */
 var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
     gceUiOptions, commonQueryData) {
+
+  /**
+   * The URL to start instances.
+   * @type {string}
+   * @private
+   */
   this.startInstanceUrl_ = startInstanceUrl;
+
+  /**
+   * The URL to list instances.
+   * @type {string}
+   * @private
+   */
   this.listInstanceUrl_ = listInstanceUrl;
+
+  /**
+   * The URL to stop instances.
+   * @type {string}
+   * @private
+   */
   this.stopInstanceUrl_ = stopInstanceUrl;
+
+  /**
+   * Object mapping Ajax response code to handler.
+   * @type {Object}
+   * @private
+   */
   this.statusCodeResponseFunctions_ = {
     401: function(jqXHR, textStatus, errorThrown) {
       alert('Refresh token revoked! ' + textStatus + ':' + errorThrown);
@@ -41,44 +65,43 @@ var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
       alert('Unknown error! ' + textStatus + ':' + errorThrown);
     }
   };
+
+  /**
+   * Query data to be passed with every request.
+   * @type {Object}
+   * @private
+   */
   this.commonQueryData_ = commonQueryData;
+
   this.setOptions(gceUiOptions);
 };
 
-/**
- * The URL to start instances.
- * @type {string}
- * @private
- */
-Gce.prototype.startInstanceUrl_ = null;
 
-/**
- * The URL to list instances.
- * @type {string}
- * @private
- */
-Gce.prototype.listInstanceUrl_ = null;
-
-/**
- * The URL to stop instances.
- * @type {string}
- * @private
- */
-Gce.prototype.stopInstanceUrl_ = null;
-
-/**
- * Object mapping Ajax response code to handler.
- * @type {Object}
- * private
- */
-Gce.prototype.statusCodeResponseFunctions_ = null;
 
 /**
  * Time (ms) between calls to server to check for running instances.
  * @type {number}
- * private
+ * @private
  */
 Gce.prototype.HEARTBEAT_TIMEOUT_ = 2000;
+
+
+/**
+ * The various states (status in the GCE API) that an instance can be in. The
+ *    UNKNOWN and SERVING states are synthetic.
+ * @type {Array}
+ * @private
+ */
+Gce.prototype.STATES = [
+  'UNKNOWN',
+  'PROVISIONING',
+  'STAGING',
+  'RUNNING',
+  'SERVING',
+  'STOPPING',
+  'STOPPED',
+  'TERMINATED',
+];
 
 /**
  * Sets the GCE UI options. Options include colored squares to indicate
@@ -90,10 +113,11 @@ Gce.prototype.setOptions = function(gceUiOptions) {
 };
 
 /**
- * Send the Ajax request to start instances. Init UI controls with start method.
+ * Send the Ajax request to start instances. Init UI controls with start
+ *    method.
  * @param {number} numInstances The number of instances to start.
  * @param {Object} startOptions Consists of startOptions.data and
- *     startOptions.callback.
+ *    startOptions.callback.
  */
 Gce.prototype.startInstances = function(numInstances, startOptions) {
   for (var gceUi in this.gceUiOptions) {
@@ -117,7 +141,11 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
   }
   $.ajax(ajaxRequest);
   if (this.gceUiOptions || startOptions.callback) {
-    this.heartbeat_(numInstances, startOptions.callback);
+    var terminalState = 'RUNNING'
+    if (startOptions.checkServing) {
+      terminalState = 'SERVING'
+    }
+    this.heartbeat_(numInstances, startOptions.callback, terminalState);
   }
 };
 
@@ -139,8 +167,22 @@ Gce.prototype.stopInstances = function(callback) {
     data: data
   });
   if (this.gceUiOptions || callback) {
-    this.heartbeat_(0, callback);
+    this.heartbeat_(0, callback, 'TOTAL');
   }
+};
+
+
+/**
+ * Get an update on instance states and status.
+ * @param {function} callback A function to call when AJAX request completes.
+ * @param {Object} optionalData Optional data to send with the request.
+ */
+Gce.prototype.getInstanceStates = function(callback, optionalData) {
+  var that = this;
+  var processResults = function(data) {
+    callback(data, that.summarizeStates(data));
+  }
+  this.getStatuses_(processResults, optionalData)
 };
 
 /**
@@ -192,23 +234,19 @@ Gce.prototype.updateUI_ = function(data) {
 
 /**
  * Send the Ajax request to start instances. Update UI controls with an update
- * method.
+ *    method.
  * @param {number} numInstances The number of instances that are starting.
- * @param {function} callback A callback function to call when instances
- *     have started or stopped.
+ * @param {function} callback A callback function to call when instances have
+ *    started or stopped.
+ * @param {string} terminalState Stop the heartbeat when all numInstances are
+ *    in this state.
  * @private
  */
-Gce.prototype.heartbeat_ = function(numInstances, callback) {
+Gce.prototype.heartbeat_ = function(numInstances, callback, terminalState) {
   var that = this;
   var success = function(data) {
-    // If doing a shutdown (numInstances == 0), check the
-    // number alive rather than the number running. We want
-    // them all completely shutdown.
-    if (numInstances) {
-      isDone = that.numRunning_(data) == numInstances;
-    } else {
-      isDone = that.numAlive_(data) == 0;
-    }
+    var stateSummary = that.summarizeStates(data)
+    isDone = stateSummary[terminalState] == numInstances;
 
     if (isDone) {
       for (var gceUi in that.gceUiOptions) {
@@ -236,8 +274,8 @@ Gce.prototype.heartbeat_ = function(numInstances, callback) {
 /**
  * Send Ajax request to get instance information.
  * @param {function} success Function to call if request is successful.
- * @param {Object} optionalData Optional data to send with the request. The data
- *     is added as URL parameters.
+ * @param {Object} optionalData Optional data to send with the request. The
+ *    data is added as URL parameters.
  * @private
  */
 Gce.prototype.getStatuses_ = function(success, optionalData) {
@@ -265,20 +303,39 @@ Gce.prototype.getStatuses_ = function(success, optionalData) {
 };
 
 /**
+ * Builds a histogram of how many instances are in what state.
+ * @param  {Object} data Data returned from the GCE API formatted into a
+ *    dictionary.
+ * @return {Object}      A map from state to count.
+ */
+Gce.prototype.summarizeStates = function(data) {
+  var states = {};
+  $.each(this.STATES, function(index, value) {
+    states[value] = 0;
+  });
+  states['TOTAL'] = 0;
+
+  $.each(data, function(i, d) {
+    state = d['status'];
+    if (!states.hasOwnProperty(state)) {
+      state = 'UNKNOWN';
+    }
+    states[state]++;
+    states['TOTAL']++;
+  });
+
+  return states;
+};
+
+/**
  * Count the number of running instances.
  * @param {Object} data Data returned from GCE API formatted in a dictionary
- *     mapping instance name to a dictionary with a status parameter.
+ *    mapping instance name to a dictionary with a status parameter.
  * @private
  * @return {number} The number of running instances.
  */
 Gce.prototype.numRunning_ = function(data) {
-  var numRunning = 0;
-  for (var instance in data) {
-    if (data[instance]['status'] == 'RUNNING') {
-      numRunning++;
-    }
-  }
-  return numRunning;
+  return this.summarizeStates(data)['RUNNING'];
 };
 
 /**
@@ -289,9 +346,5 @@ Gce.prototype.numRunning_ = function(data) {
  * @return {number} The number of instances that are up.
  */
 Gce.prototype.numAlive_ = function(data) {
-  var numAlive = 0;
-  for (var instance in data) {
-    numAlive++;
-  }
-  return numAlive;
+  return this.summarizeStates(data)['TOTAL'];
 };

@@ -19,6 +19,9 @@ handlers:
 - url: /bootstrap
   static_dir: static/bootstrap
 
+- url: /fontawesome
+  static_dir: static/fontawesome
+
 - url: /oauth2callback.*
   script: main.app
 

@@ -199,8 +199,8 @@ Fractal.prototype.initialize = function() {
  */
 Fractal.prototype.checkRunning = function() {
   var that = this;
-  that.gce_.checkIfRunning(function(data, numRunning) {
-    if (numRunning >= that.num_instances_) {
+  that.gce_.getInstanceStates(function(data, stateSummary) {
+    if (stateSummary['SERVING'] >= that.num_instances_) {
       that.mapIt_(data);
     }
   });
@@ -212,15 +212,7 @@ Fractal.prototype.checkRunning = function() {
  *  running then show the map.
  */
 Fractal.prototype.start = function() {
-  var that = this;
-
-  that.gce_.checkIfRunning(function(data, numRunning) {
-    if (numRunning == that.num_instances_) {
-      that.mapIt_(data);
-    } else {
-      that.startInstances_();
-    }
-  });
+  this.startInstances_();
 };
 
 /**
@@ -237,6 +229,7 @@ Fractal.prototype.startInstances_ = function() {
     data: {
       'num_instances': that.num_instances_
     },
+    checkServing: true,
     callback: function(data) {
       that.mapIt_(data);
     }

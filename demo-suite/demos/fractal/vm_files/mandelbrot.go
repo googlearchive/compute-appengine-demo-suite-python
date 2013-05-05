@@ -54,7 +54,7 @@ const (
 
 	// How many times we run the easing loop.  Higher numbers will be sharper
 	// transitions between color stops.
-	colorRampEase = 3
+	colorRampEase = 2
 
 	enableDebugLog = false
 )

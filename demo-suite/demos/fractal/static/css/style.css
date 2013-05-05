@@ -1,3 +1,8 @@
+#spinner {
+  vertical-align: middle;
+  display:inline-block;
+}
+
 .map-container {
   height: 450px;
 }
