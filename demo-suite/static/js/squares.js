@@ -190,3 +190,13 @@ Squares.prototype.setStatusClass = function(instanceName, color) {
   }
   square.addClass(color);
 };
+
+/**
+ * Get the div for an instance.
+ * @param  {string} instanceName The instance.
+ * @return {JQuery}              A JQuery object wrapping the div that
+ *    represents instanceName.
+ */
+Squares.prototype.getSquareDiv = function(instanceName) {
+  return this.squares_[instanceName];
+};
