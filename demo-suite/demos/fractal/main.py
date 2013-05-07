@@ -39,6 +39,7 @@ MACHINE_TYPE='n1-highcpu-4'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
+HEALTH_CHECK_TIMEOUT = 1
 
 VM_FILES = os.path.join(os.path.dirname(__file__), 'vm_files')
 STARTUP_SCRIPT = os.path.join(VM_FILES, 'startup.sh')
@@ -102,6 +103,9 @@ class Instance(RequestHandler):
         'Error listing instances: ',
         filter='name eq ^%s-.*' % self.InstancePrefix())
 
+    # A map of instanceName -> RPC
+    health_rpcs = {}
+
     # Convert instance info to dict and check server status.
     instance_dict = {}
     if instances:
@@ -124,19 +128,25 @@ class Instance(RequestHandler):
         # Ping the instance server. If result is 'ok', set status to
         # SERVING.
         if ip and instance.status == 'RUNNING':
-          result = None
-          try:
-            logging.debug('Health checking %s', ip)
-            result = urlfetch.fetch(url='http://%s/health' % ip, deadline=1)
-            if result and result.content.strip() == 'ok':
-              logging.debug('%s healthy!', ip)
-              instance_record['status'] = 'SERVING'
-            else:
-              logging.debug('%s unhealthy.  Content: %s', ip, result.content)
-          except urlfetch.Error:
-            logging.debug('%s unhealthy', ip)
+          health_url = 'http://%s/health' % ip
+          logging.debug('Health checking %s', health_url)
+          rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
+          urlfetch.make_fetch_call(rpc, url=health_url)
+          health_rpcs[instance.name] = rpc
 
-        logging.debug('Instance data: %s: %s', instance.name, instance_record)
+    # wait for RPCs to complete and update dict as necessary
+    for (instance_name, rpc) in health_rpcs.items():
+      result = None
+      instance_record = instance_dict[instance_name]
+      try:
+        result = rpc.get_result()
+        if result and result.content.strip() == 'ok':
+          logging.debug('%s healthy!', ip)
+          instance_record['status'] = 'SERVING'
+        else:
+          logging.debug('%s unhealthy.  Content: %s', ip, result.content)
+      except urlfetch.Error:
+        logging.debug('%s unhealthy', ip)
 
     json_instances = json.dumps(instance_dict)
     self.response.headers['Content-Type'] = 'application/json'
