@@ -35,7 +35,7 @@ from google.appengine.api import urlfetch
 
 DEMO_NAME = 'fractal'
 IMAGE = 'fractal-demo-image'
-MACHINE_TYPE='n1-highcpu-4'
+MACHINE_TYPE='n1-highcpu-2'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
@@ -45,6 +45,7 @@ VM_FILES = os.path.join(os.path.dirname(__file__), 'vm_files')
 STARTUP_SCRIPT = os.path.join(VM_FILES, 'startup.sh')
 GO_PROGRAM = os.path.join(VM_FILES, 'mandelbrot.go')
 GO_ARGS = '--portBase=80 --numPorts=1'
+GO_TILESERVER_FLAG = '--tileServers='
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -199,7 +200,7 @@ class Instance(RequestHandler):
     images = gce_project.list_images(filter='name eq ^%s-$' % IMAGE)
     return bool(images)
 
-  def _get_instance_metadata(self):
+  def _get_instance_metadata(self, instance_names):
     """The metadata values to pass into the instance."""
     inline_values = {
       'goargs': GO_ARGS,
@@ -209,6 +210,10 @@ class Instance(RequestHandler):
       'startup-script': STARTUP_SCRIPT,
       'goprog': GO_PROGRAM,
     }
+
+    if instance_names and len(instance_names) > 1:
+      tile_servers = ','.join(instance_names)
+      inline_values['goargs'] += ' %s%s' % (GO_TILESERVER_FLAG, tile_servers)
 
     metadata = []
     for k, v in inline_values.items():
@@ -237,15 +242,19 @@ class Instance(RequestHandler):
       image_name = IMAGE
       image_project_id = gce.project_id
 
-    instance_list = []
+    instance_names = []
     for i in range(num_instances):
+      instance_names.append('%s-%02d' % (self.InstancePrefix(), i))
+
+    instance_list = []
+    for instance_name in instance_names:
       instance = gce.Instance(
-          name='%s-%02d' % (self.InstancePrefix(), i),
+          name=instance_name,
           machine_type_name=MACHINE_TYPE,
           image_name=image_name,
           image_project_id=image_project_id,
           tags=[DEMO_NAME],
-          metadata=self._get_instance_metadata(),
+          metadata=self._get_instance_metadata(instance_names),
           service_accounts=gce_project.settings['cloud_service_account'])
       instance_list.append(instance)
     return instance_list
