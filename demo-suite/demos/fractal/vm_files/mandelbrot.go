@@ -46,7 +46,7 @@ var (
 const (
 	// The number of iterations of the Mandelbrot calculation.
 	// More iterations mean higher quality at the cost of more CPU time.
-	iterations = 4000
+	iterations = 1000
 
 	// The size of an edge of the tile by default
 	defaultTileSize = 256
@@ -65,8 +65,12 @@ const (
 	// transitions between color stops.
 	colorRampEase = 2
 
+	// How much to oversample when generating pixels.  The number of values
+	// calculated per pixel will be this value squared.
+	pixelOversample = 3
+
 	// The final tile size that actually gets rendered
-	leafTileSize = 128
+	leafTileSize = 32
 
 	enableDebugLog = false
 )
@@ -304,16 +308,35 @@ func renderImage(x, y, z, tileSize int) []byte {
 	// tileX and tileY is the absolute position of this tile at the current zoom
 	// level.
 	numTiles := int(1 << uint(z))
-	tileX, tileY := x*tileSize, y*tileSize
-	scale := 1 / float64(numTiles*baseZoomSize)
+	oversampleTileSize := tileSize * pixelOversample
+	tileXOrigin, tileYOrigin := x*tileSize*pixelOversample, y*tileSize*pixelOversample
+	scale := 1 / float64(numTiles*baseZoomSize*pixelOversample)
 
-	debugLog.Printf("Rendering Tile x: %v y: %v z: %v tileSize: %v tileX: %v tileY: %v scale: %v", x, y, z, tileSize, tileX, tileY, scale)
+	debugLog.Printf("Rendering Tile x: %v y: %v z: %v tileSize: %v ", x, y, z, tileSize)
 
 	img := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
-	for i := 0; i < tileSize; i++ {
-		for j := 0; j < tileSize; j++ {
-			c := complex(float64(tileX+i)*scale, float64(tileY+j)*scale)
-			img.SetRGBA(i, j, mandelbrotColor(c, z))
+	for tileX := 0; tileX < oversampleTileSize; tileX += pixelOversample {
+		for tileY := 0; tileY < oversampleTileSize; tileY += pixelOversample {
+			var r, g, b int32
+			for dX := 0; dX < pixelOversample; dX++ {
+				for dY := 0; dY < pixelOversample; dY++ {
+					c := complex(float64(tileXOrigin+tileX+dX)*scale,
+						float64(tileYOrigin+tileY+dY)*scale)
+					// log.Println(c)
+					clr := mandelbrotColor(c, z)
+					r += int32(clr.R)
+					g += int32(clr.G)
+					b += int32(clr.B)
+				}
+			}
+			img.SetRGBA(
+				tileX/pixelOversample,
+				tileY/pixelOversample,
+				color.RGBA{
+					uint8(r / (pixelOversample * pixelOversample)),
+					uint8(g / (pixelOversample * pixelOversample)),
+					uint8(b / (pixelOversample * pixelOversample)),
+					0xFF})
 		}
 	}
 
