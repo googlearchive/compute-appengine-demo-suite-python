@@ -6,9 +6,6 @@ should have the same control.
 * Make it easier to update program on VMs without restarting.  Push new
 program/params and have something in guest quit and be restarted.
 
-* build a new image map that will only load N tiles at a time. This should make
-this more fair between the two maps.
-
 * Add a memcached layer for caching tiles
 
 * Start exporting/collecting statistics on # of tiles served, avg latency, etc.

@@ -5,16 +5,17 @@
  * instance to 16.
  */
 
-var fractal1
+var fractal1;
+var fractal16;
 
 $(document).ready(function() {
   $('.btn').button();
   configSpinner();
   var fractal16 = new Fractal($('#fractal16'), FAST_MAP_INSTANCE_TAG,
-    NUM_FAST_MAP_INSTANCES);
+  NUM_FAST_MAP_INSTANCES);
   fractal16.initialize();
   fractal1 = new Fractal($('#fractal1'), SLOW_MAP_INSTANCE_TAG,
-    NUM_SLOW_MAP_INSTANCES, fractal16);
+  NUM_SLOW_MAP_INSTANCES, fractal16);
   fractal1.initialize();
 
   $('#start').click(function() {
@@ -65,16 +66,16 @@ var FAST_MAP_INSTANCE_TAG = 'map16';
  * This really helps to show that something is going on.  It is the
  * simplest blinking light that we can add.
  */
+
 function configSpinner() {
   $('#spinner')
     .css('visibility', 'hidden')
     .ajaxStart(function() {
-        $('#spinner').css('visibility', '');
-    })
+    $('#spinner').css('visibility', '');
+  })
     .ajaxStop(function() {
-        $('#spinner').css('visibility', 'hidden');
-    })
-  ;
+    $('#spinner').css('visibility', 'hidden');
+  });
 }
 
 /**
@@ -162,7 +163,7 @@ Fractal.prototype.LONGITUDE_ = 157.5;
  * The default tile size
  * @type {Number}
  */
-Fractal.prototype.TILE_SIZE_ = 256;
+Fractal.prototype.TILE_SIZE_ = 64;
 
 /**
  * The minimum zoom on the map
@@ -196,19 +197,21 @@ Fractal.prototype.initialize = function() {
   }
 
   this.squares_ = new Squares(
-      squaresContainer.get(0), instanceNames, {
-        cols: 8
-      });
+  squaresContainer.get(0), instanceNames, {
+    cols: 8
+  });
   this.squares_.drawSquares();
 
   // DEMO_NAME is set in the index.html template file.
   this.gce_ = new Gce('/' + DEMO_NAME + '/instance',
-      '/' + DEMO_NAME + '/instance',
-      '/' + DEMO_NAME + '/cleanup',
-      null, { 'tag': this.tag_ });
+    '/' + DEMO_NAME + '/instance',
+    '/' + DEMO_NAME + '/cleanup',
+  null, {
+    'tag': this.tag_
+  });
   this.gce_.setOptions({
-      squares: this.squares_
-    });
+    squares: this.squares_
+  });
 }
 
 /**
@@ -237,8 +240,8 @@ Fractal.prototype.start = function() {
  * Reset the map.  Shut down the instances and clear the map.
  */
 Fractal.prototype.reset = function() {
-    this.stopMap_();
-    this.gce_.stopInstances();
+  this.stopMap_();
+  this.gce_.stopInstances();
 };
 
 Fractal.prototype.startInstances_ = function() {
@@ -293,8 +296,7 @@ Fractal.prototype.prepMap_ = function(ips) {
   var fractalTypeOptions = {
     getTileUrl: function(coord, zoom) {
       var url = ['http://'];
-//      if (ips.length > 1) {
-      if (false) {
+      if (ips.length > 1) {
         var instanceIdx = Math.abs(coord.x + (4 * coord.y)) % numInstances;
         // var instanceIdx = Math.abs(Math.round(coord.x * Math.sqrt(numInstances) + coord.y)) % numInstances;
         url.push(ips[instanceIdx]);
@@ -323,7 +325,7 @@ Fractal.prototype.prepMap_ = function(ips) {
   this.mapContainer_.addClass('map-container');
   $(this.container_).find('.map-row').append(this.mapContainer_);
   var map = this.drawMap_(this.mapContainer_,
-      fractalTypeOptions, 'Mandelbrot');
+  fractalTypeOptions, 'Mandelbrot');
   return map;
 };
 
@@ -375,7 +377,7 @@ Fractal.prototype.getIps_ = function(data) {
  * @private
  */
 Fractal.prototype.drawMap_ = function(canvas, fractalTypeOptions, mapTypeId) {
-  var fractalMapType = new google.maps.ImageMapType(fractalTypeOptions);
+  var fractalMapType = new ThrottledImageMap(fractalTypeOptions);
 
   var mapOptions = {
     center: new google.maps.LatLng(this.LATITUDE_, this.LONGITUDE_),
@@ -393,4 +395,68 @@ Fractal.prototype.drawMap_ = function(canvas, fractalTypeOptions, mapTypeId) {
   map.mapTypes.set(mapTypeId, fractalMapType);
   map.setMapTypeId(mapTypeId);
   return map;
+};
+
+/**
+ * A MapType object that throttles image requests
+ * @param {Object} opts
+ */
+var ThrottledImageMap = function(opts) {
+  this.alt = opts['alt'];
+  this.tileSize = opts['tileSize'];
+  this.name = opts['name'];
+  this.minZoom = opts['minZoom'];
+  this.maxZoom = opts['maxZoom'];
+  this.maxDownloading = opts['maxDownloading'] || 5;
+  this.getTileUrl = opts['getTileUrl'];
+
+  this.loadingTiles = {};
+  this.loadQueue = [];
+}
+
+ThrottledImageMap.prototype.getTile = function(tileCoord, zoom, ownerDocument) {
+  var tileDiv = ownerDocument.createElement('div');
+  var tileUrl = this.getTileUrl(tileCoord, zoom);
+  tileDiv.tileUrl = tileUrl;
+  tileDiv.style.width = this.tileSize.width + 'px';
+  tileDiv.style.height = this.tileSize.height + 'px';
+
+  this.addTileToQueue_(tileDiv);
+  this.processQueue_();
+
+  return tileDiv;
+};
+
+ThrottledImageMap.prototype.releaseTile = function(tile) {};
+
+ThrottledImageMap.prototype.addTileToQueue_ = function(tileDiv) {
+  this.loadQueue.push(tileDiv);
+};
+
+ThrottledImageMap.prototype.processQueue_ = function() {
+  while (this.loadQueue.length > 0 && Object.keys(this.loadingTiles).length < this.maxDownloading) {
+    var tileDiv = this.loadQueue.shift();
+    var tileUrl = tileDiv.tileUrl;
+    var img = tileDiv.ownerDocument.createElement('img');
+    img.style.width = this.tileSize.width + 'px';
+    img.style.height = this.tileSize.height + 'px';
+    img.onload = this.onImageLoaded_.bind(this, tileUrl);
+    img.onerror = this.onImageError_.bind(this, tileUrl);
+    console.log('Loading image: ' + tileUrl);
+    img.src = tileUrl;
+    tileDiv.appendChild(img);
+    this.loadingTiles[tileDiv.tileUrl] = tileDiv;
+  }
+};
+
+ThrottledImageMap.prototype.onImageLoaded_ = function(tileUrl) {
+  console.log('Image Loaded: ' + tileUrl);
+  delete this.loadingTiles[tileUrl];
+  this.processQueue_();
+};
+
+ThrottledImageMap.prototype.onImageError_ = function(tileUrl) {
+  console.log('Image Error: ' + tileUrl);
+  delete this.loadingTiles[tileUrl];
+  this.processQueue_();
 };
