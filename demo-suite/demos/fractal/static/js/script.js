@@ -25,11 +25,11 @@ var fractal16;
 $(document).ready(function() {
   $('.btn').button();
   configSpinner();
-  var fractal16 = new Fractal($('#fractal16'), FAST_MAP_INSTANCE_TAG,
-  NUM_FAST_MAP_INSTANCES);
+  fractal16 = new Fractal($('#fractal16'), FAST_MAP_INSTANCE_TAG,
+    NUM_FAST_MAP_INSTANCES);
   fractal16.initialize();
   fractal1 = new Fractal($('#fractal1'), SLOW_MAP_INSTANCE_TAG,
-  NUM_SLOW_MAP_INSTANCES, fractal16);
+    NUM_SLOW_MAP_INSTANCES, fractal16);
   fractal1.initialize();
 
   $('#start').click(function() {
@@ -420,14 +420,19 @@ Fractal.prototype.addListeners_ = function() {
  * @private
  */
 Fractal.prototype.getIps_ = function(data) {
-  var ips = [];
-  for (var instanceName in data['instances']) {
-    ip = data['instances'][instanceName]['externalIp'];
-    if (ip) {
-      ips.push(ip);
+  lbs = data['loadbalancers'] || []
+  if (lbs.length > 0) {
+    return lbs
+  } else {
+    var ips = [];
+    for (var instanceName in data['instances']) {
+      ip = data['instances'][instanceName]['externalIp'];
+      if (ip) {
+        ips.push(ip);
+      }
     }
+    return ips;
   }
-  return ips;
 };
 
 /**
