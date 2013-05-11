@@ -153,12 +153,12 @@ Squares.prototype.drawSquares = function() {
  * @param {Object} updateData The status data returned from the server.
  */
 Squares.prototype.update = function(updateData) {
-  var data = updateData['data'];
+  var instanceStatus = updateData['instances'];
   for (var i = 0; i < this.instanceNames_.length; i++) {
     var instanceName = this.instanceNames_[i];
     var statusClass = null;
-    if (data.hasOwnProperty(instanceName)) {
-      var status = data[instanceName]['status'];
+    if (instanceStatus.hasOwnProperty(instanceName)) {
+      var status = instanceStatus[instanceName]['status'];
       statusClass = this.statusClasses_[status];
       if (!statusClass) {
         statusClass = this.statusClasses_['OTHER'];

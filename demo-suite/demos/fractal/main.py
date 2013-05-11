@@ -149,9 +149,11 @@ class Instance(RequestHandler):
       except urlfetch.Error:
         logging.debug('%s unhealthy', ip)
 
-    json_instances = json.dumps(instance_dict)
+    response_dict = {
+      'instances': instance_dict,
+    }
     self.response.headers['Content-Type'] = 'application/json'
-    self.response.out.write(json_instances)
+    self.response.out.write(json.dumps(response_dict))
 
   @oauth_decorator.oauth_required
   @data_handler.data_required

@@ -220,8 +220,8 @@ Fractal.prototype.initialize = function() {
  */
 Fractal.prototype.checkRunning = function() {
   var that = this;
-  that.gce_.getInstanceStates(function(data, stateSummary) {
-    if (stateSummary['SERVING'] >= that.num_instances_) {
+  that.gce_.getInstanceStates(function(data) {
+    if (data['stateCount']['SERVING'] >= that.num_instances_) {
       that.mapIt_(data);
     }
   });
@@ -361,9 +361,8 @@ Fractal.prototype.addListeners_ = function() {
  */
 Fractal.prototype.getIps_ = function(data) {
   var ips = [];
-  var slowMapIps = [];
-  for (var instanceName in data) {
-    ips.push(data[instanceName]['externalIp']);
+  for (var instanceName in data['instances']) {
+    ips.push(data['instances'][instanceName]['externalIp']);
   }
   return ips;
 };
