@@ -224,6 +224,30 @@ func quitHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func resetVarMap(varMap *expvar.Map) {
+	// There is no easy way to delete/clear expvar.Map.  As such there is a slight
+	// race here.  *sigh*
+	keys := []string{}
+	varMap.Do(func(kv expvar.KeyValue) {
+		keys = append(keys, kv.Key)
+	})
+
+	for _, key := range keys {
+		varMap.Set(key, new(expvar.Int))
+	}
+}
+
+func varResetHandler(w http.ResponseWriter, r *http.Request) {
+	resetVarMap(requestCounts)
+	resetVarMap(requestTime)
+	resetVarMap(tileCount)
+	resetVarMap(tileTime)
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	fmt.Fprintln(w, "ok")
+}
+
 func downloadAndCompositeTiles(x, y, z, tileSize int) []byte {
 	resultImg := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
 
@@ -403,6 +427,7 @@ func main() {
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/tile", tileHandler)
 	http.HandleFunc("/debug/quit", quitHandler)
+	http.HandleFunc("/debug/vars/reset", varResetHandler)
 
 	// Support opening multiple ports so that we aren't bound by HTTP connection
 	// limits in browsers.

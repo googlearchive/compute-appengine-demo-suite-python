@@ -8,5 +8,4 @@
 * Run the 16 servers across 2 zones.
 * Put some buttons to jump to points of interest.
 * Add the ability to add/remove instances dynamically
-* Provide a way to reset counters/stats.
 * Improve visual demarcation of 1 vs. many servers.

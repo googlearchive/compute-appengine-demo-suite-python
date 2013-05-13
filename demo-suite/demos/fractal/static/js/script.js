@@ -40,6 +40,10 @@ $(document).ready(function() {
     fractal1.reset();
     fractal16.reset();
   });
+  $('#clearVars').click(function() {
+    fractal1.clear_vars();
+    fractal16.clear_vars();
+  })
 });
 
 /**
@@ -158,7 +162,14 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    * The list of IPs that are serving.
    * @type {Array}
    */
-  this.ips_ = []
+  this.ips_ = [];
+
+  /**
+   * The last data returned from the server.  Useful for async actions that must
+   * interact with individual servers directly.
+   * @type {Object}
+   */
+  this.last_data_ = {};
 };
 
 /**
@@ -245,6 +256,7 @@ Fractal.prototype.initialize = function() {
 }
 
 Fractal.prototype.heartbeat = function(data) {
+  this.last_data_ = data;
   this.ips_ = this.getIps_(data);
   if (data['stateCount']['SERVING'] == this.num_instances_) {
     this.mapIt_();
@@ -252,7 +264,19 @@ Fractal.prototype.heartbeat = function(data) {
     this.stopMap_();
   }
 };
-// TODO: Add display of vars.
+
+Fractal.prototype.clear_vars = function() {
+  instances = this.last_data_['instances'] || {};
+  for (var instanceName in instances) {
+    ip = instances[instanceName]['externalIp'];
+    if (ip) {
+      $.ajax('http://' + ip + '/debug/vars/reset', {
+        type: 'POST',
+      });
+    }
+  }
+
+};
 
 /**
  * Start up the instances if necessary. When the instances are confirmed to be
