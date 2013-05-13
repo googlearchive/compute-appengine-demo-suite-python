@@ -209,12 +209,12 @@ Fractal.prototype.MAX_ZOOM_ = 30;
  */
 Fractal.prototype.initialize = function() {
   // Set up the DOM under container_
-  var squaresRow = $('<div>').addClass('row').addClass('squares-row');
-  var squaresContainer = $('<div>').addClass('span4').addClass('squares');
+  var squaresRow = $('<div>').addClass('row-fluid').addClass('squares-row');
+  var squaresContainer = $('<div>').addClass('span8').addClass('squares');
   squaresRow.append(squaresContainer);
   $(this.container_).append(squaresRow);
 
-  var mapRow = $('<div>').addClass('row').addClass('map-row');
+  var mapRow = $('<div>').addClass('row-fluid').addClass('map-row');
   $(this.container_).append(mapRow);
 
   // Initialize the squares
@@ -229,7 +229,7 @@ Fractal.prototype.initialize = function() {
     });
   this.squares_.drawSquares();
 
-  var statContainer = $('<div>').addClass('span2');
+  var statContainer = $('<div>').addClass('span4');
   squaresRow.append(statContainer);
   this.statDisplay_ = new StatDisplay(statContainer, 'Avg Render Time', 'ms',
     function (data) {
@@ -363,7 +363,7 @@ Fractal.prototype.prepMap_ = function() {
   };
 
   this.mapContainer_ = $('<div>');
-  this.mapContainer_.addClass('span6');
+  this.mapContainer_.addClass('span12');
   this.mapContainer_.addClass('map-container');
   $(this.container_).find('.map-row').append(this.mapContainer_);
   var map = this.drawMap_(this.mapContainer_,

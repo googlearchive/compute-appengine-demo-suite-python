@@ -122,16 +122,9 @@ var Squares = function(container, instanceNames, squareOptions) {
  * Draws the squares on the HTML page.
  */
 Squares.prototype.drawSquares = function() {
-  // First, clean up any old instace squares.
+  // First, clean up any old instance squares.
   this.reset();
 
-  // Add the columns.
-  var columns = [];
-  for (var i = 0; i < this.numCols_; i++) {
-    var col = $('<div>').addClass('span1');
-    this.container_.append(col);
-    columns.push(col);
-  }
 
   // Add the color squares.
   for (var i = 0; i < this.instanceNames_.length; i++) {
@@ -141,9 +134,12 @@ Squares.prototype.drawSquares = function() {
       .addClass('color-block')
       .addClass(this.statusClasses_['OTHER'])
       .append('<i class="icon-ok icon-2x"></i>');
-    var columnNum = i % this.numCols_;
-    columns[columnNum].append(square);
+    this.container_.append(square);
     this.squares_[instanceName] = square;
+
+    if ((i+1) % this.numCols_ == 0) {
+      $('<br>').appendTo(this.container_);
+    }
   }
 };
 
