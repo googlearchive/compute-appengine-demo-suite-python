@@ -44,6 +44,7 @@ $(document).ready(function() {
     fractal1.clear_vars();
     fractal16.clear_vars();
   })
+  $('#randomPoi').click(gotoRandomPOI)
 });
 
 /**
@@ -81,7 +82,6 @@ var FAST_MAP_INSTANCE_TAG = 'map16';
  * This really helps to show that something is going on.  It is the
  * simplest blinking light that we can add.
  */
-
 function configSpinner() {
   $('#spinner')
     .css('visibility', 'hidden')
@@ -91,6 +91,24 @@ function configSpinner() {
     .ajaxStop(function() {
     $('#spinner').css('visibility', 'hidden');
   });
+}
+
+var POINTS_OF_INTEREST = [
+  { x: -56.18426015515269, y: 87.95310974121094, z: 13 },
+  { x: -55.06490220044015, y: 83.02677154541016, z: 12 },
+  { x: -56.20683602602539, y: 87.77841478586197, z: 18 },
+  { x: -56.18445122198682, y: 87.96031951904297, z: 18 },
+  { x: 4.041501376702832, y: 187.31689453125, z: 12 },
+  { x: 39.91121803996906, y: 204.35609936714172, z: 21 },
+];
+
+/**
+ * Go to a random point of interest on the maps.
+ */
+function gotoRandomPOI () {
+  poi = POINTS_OF_INTEREST[Math.floor(Math.random() * POINTS_OF_INTEREST.length)];
+  fractal1.map.setCenter(new google.maps.LatLng(poi.x, poi.y, true));
+  fractal1.map.setZoom(poi.z);
 }
 
 /**
