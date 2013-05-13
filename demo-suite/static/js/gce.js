@@ -73,6 +73,15 @@ var Gce = function(startInstanceUrl, listInstanceUrl, stopInstanceUrl,
    */
   this.commonQueryData_ = commonQueryData;
 
+  /**
+   * Are we doing continuous heartbeats to the server?  If yes, we don't do
+   * heartbeats specifically for start/stop operations and so never generate UI
+   * start/stop messages.
+   * @type {Boolean}
+   * @private
+   */
+  this.doContinuousHeartbeat_ = false;
+
   this.setOptions(gceUiOptions);
 };
 
@@ -140,7 +149,8 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     $.extend(ajaxRequest.data, this.commonQueryData_)
   }
   $.ajax(ajaxRequest);
-  if (this.gceUiOptions || startOptions.callback) {
+  if (!this.doContinuousHeartbeat_
+    && (this.gceUiOptions || startOptions.callback)) {
     var terminalState = 'RUNNING'
     if (startOptions.checkServing) {
       terminalState = 'SERVING'
@@ -166,7 +176,8 @@ Gce.prototype.stopInstances = function(callback) {
     statusCode: this.statusCodeResponseFunctions_,
     data: data
   });
-  if (this.gceUiOptions || callback) {
+  if (!this.doContinuousHeartbeat_
+    && (this.gceUiOptions || startOptions.callback)) {
     this.heartbeat_(0, callback, 'TOTAL');
   }
 };
@@ -183,6 +194,19 @@ Gce.prototype.getInstanceStates = function(callback, optionalData) {
     callback(data);
   }
   this.getStatuses_(processResults, optionalData)
+};
+
+/**
+ * Start continuous heartbeat.  If this is activated we no longer do heartbeats
+ * specifically for start/stopInstances and UI components no longer get
+ * corresponding start/stop calls.
+ * @param  {Function} callback A callback invoked on each heartbeat
+ */
+Gce.prototype.startContinuousHeartbeat = function(callback) {
+  if (!this.doContinuousHeartbeat_) {
+    this.doContinuousHeartbeat_ = true;
+    this.continuousHeartbeat_(callback)
+  }
 };
 
 /**
@@ -233,6 +257,22 @@ Gce.prototype.heartbeat_ = function(numInstances, callback, terminalState) {
     that.getStatuses_(success);
   }, this.HEARTBEAT_TIMEOUT_);
 };
+
+Gce.prototype.continuousHeartbeat_ = function(callback) {
+  var that = this;
+  var success = function(data) {
+    if (callback) {
+      callback(data);
+    }
+    that.continuousHeartbeat_(callback);
+  };
+
+  var that = this;
+  setTimeout(function() {
+    that.getStatuses_(success);
+  }, this.HEARTBEAT_TIMEOUT_);
+
+}
 
 /**
  * Send Ajax request to get instance information.

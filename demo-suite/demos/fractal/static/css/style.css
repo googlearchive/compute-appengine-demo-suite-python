@@ -10,3 +10,28 @@
 .squares {
   height: 80px;
 }
+
+.stat-container {
+  background: #666;
+  color: white;
+  border-radius: 6px;
+  border: 1px solid black;
+  padding: 5px;
+}
+
+.stat-name {
+  text-align: center;
+}
+
+.stat-value-row {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.stat-value:after {
+  content: ' ';
+}

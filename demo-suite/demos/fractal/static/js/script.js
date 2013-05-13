@@ -1,4 +1,18 @@
 /**
+ * Copyright 2012 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  * @fileoverview Fractal demo JavaScript code.
  *
  * Displays zoomable, panable fractal images, comparing tile load of 1
@@ -26,9 +40,6 @@ $(document).ready(function() {
     fractal1.reset();
     fractal16.reset();
   });
-
-  fractal1.checkRunning();
-  fractal16.checkRunning();
 });
 
 /**
@@ -102,7 +113,6 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    */
   this.mapContainer_ = null;
 
-
   /**
    * The squares object that will track the state of the VMs.
    * @type {Squares}
@@ -143,6 +153,12 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    * @type {Fractal}
    */
   this.slave_fractal_ = slave_fractal;
+
+  /**
+   * The list of IPs that are serving.
+   * @type {Array}
+   */
+  this.ips_ = []
 };
 
 /**
@@ -163,7 +179,7 @@ Fractal.prototype.LONGITUDE_ = 157.5;
  * The default tile size
  * @type {Number}
  */
-Fractal.prototype.TILE_SIZE_ = 64;
+Fractal.prototype.TILE_SIZE_ = 128;
 
 /**
  * The minimum zoom on the map
@@ -183,7 +199,7 @@ Fractal.prototype.MAX_ZOOM_ = 30;
 Fractal.prototype.initialize = function() {
   // Set up the DOM under container_
   var squaresRow = $('<div>').addClass('row').addClass('squares-row');
-  var squaresContainer = $('<div>').addClass('span6').addClass('squares');
+  var squaresContainer = $('<div>').addClass('span4').addClass('squares');
   squaresRow.append(squaresContainer);
   $(this.container_).append(squaresRow);
 
@@ -197,10 +213,21 @@ Fractal.prototype.initialize = function() {
   }
 
   this.squares_ = new Squares(
-  squaresContainer.get(0), instanceNames, {
-    cols: 8
-  });
+    squaresContainer.get(0), instanceNames, {
+      cols: 8
+    });
   this.squares_.drawSquares();
+
+  var statContainer = $('<div>').addClass('span2');
+  squaresRow.append(statContainer);
+  this.statDisplay_ = new StatDisplay(statContainer, 'Avg Render Time', 'ms',
+    function (data) {
+      var vars = data['vars'] || {};
+      var avg_render_time = vars['tileTimeAvgMs'] || {};
+      return avg_render_time[this.TILE_SIZE_];
+    }.bind(this));
+
+
 
   // DEMO_NAME is set in the index.html template file.
   this.gce_ = new Gce('/' + DEMO_NAME + '/instance',
@@ -210,23 +237,22 @@ Fractal.prototype.initialize = function() {
     'tag': this.tag_
   });
   this.gce_.setOptions({
-    squares: this.squares_
+    squares: this.squares_,
+    statDisplay: this.statDisplay_,
   });
+
+  this.gce_.startContinuousHeartbeat(this.heartbeat.bind(this))
 }
 
-/**
- * Check to see if things are already running. If so, start up the map. Good
- *    on a refresh when the map is already loaded.
- */
-Fractal.prototype.checkRunning = function() {
-  var that = this;
-  that.gce_.getInstanceStates(function(data) {
-    if (data['stateCount']['SERVING'] >= that.num_instances_) {
-      that.mapIt_(data);
-    }
-  });
+Fractal.prototype.heartbeat = function(data) {
+  this.ips_ = this.getIps_(data);
+  if (data['stateCount']['SERVING'] > 0) {
+    this.mapIt_();
+  } else {
+    this.stopMap_();
+  }
 };
-
+// TODO: Add display of vars.
 
 /**
  * Start up the instances if necessary. When the instances are confirmed to be
@@ -240,7 +266,6 @@ Fractal.prototype.start = function() {
  * Reset the map.  Shut down the instances and clear the map.
  */
 Fractal.prototype.reset = function() {
-  this.stopMap_();
   this.gce_.stopInstances();
 };
 
@@ -250,10 +275,6 @@ Fractal.prototype.startInstances_ = function() {
     data: {
       'num_instances': that.num_instances_
     },
-    checkServing: true,
-    callback: function(data) {
-      that.mapIt_(data);
-    }
   })
 }
 
@@ -263,7 +284,7 @@ Fractal.prototype.startInstances_ = function() {
 Fractal.prototype.stopMap_ = function() {
   if (this.map) {
     this.map.unbindAll();
-    delete this.map;
+    this.map = null
   }
   if (this.mapContainer_) {
     $(this.mapContainer_).remove();
@@ -272,15 +293,15 @@ Fractal.prototype.stopMap_ = function() {
 }
 
 /**
- * Get external IPs, create maps, add listeners to maps.
- * @param {Object} data Data returned from the list instances call to GCE.
+ * Create maps and add listeners to maps.
  * @private
  */
-Fractal.prototype.mapIt_ = function(data) {
-  this.stopMap_();
-  var ips = this.getIps_(data);
-  this.map = this.prepMap_(ips);
-  this.addListeners_();
+Fractal.prototype.mapIt_ = function() {
+  if (!this.map) {
+    this.stopMap_();
+    this.map = this.prepMap_();
+    this.addListeners_();
+  }
 };
 
 /**
@@ -289,20 +310,17 @@ Fractal.prototype.mapIt_ = function(data) {
  * @return {google.maps.Map} Returns the map object.
  * @private
  */
-Fractal.prototype.prepMap_ = function(ips) {
-  var numInstances = ips.length;
-
+Fractal.prototype.prepMap_ = function() {
   var that = this;
   var fractalTypeOptions = {
     getTileUrl: function(coord, zoom) {
       var url = ['http://'];
-      if (ips.length > 1) {
-        var instanceIdx = Math.abs(coord.x + (4 * coord.y)) % numInstances;
-        // var instanceIdx = Math.abs(Math.round(coord.x * Math.sqrt(numInstances) + coord.y)) % numInstances;
-        url.push(ips[instanceIdx]);
-      } else {
-        url.push(ips[0]);
-      }
+      num_serving = that.ips_.length
+      var instanceIdx =
+        Math.abs(Math.round(coord.x * Math.sqrt(num_serving) + coord.y))
+        % num_serving;
+      url.push(that.ips_[instanceIdx]);
+
       var params = {
         z: zoom,
         x: coord.x,
@@ -362,7 +380,10 @@ Fractal.prototype.addListeners_ = function() {
 Fractal.prototype.getIps_ = function(data) {
   var ips = [];
   for (var instanceName in data['instances']) {
-    ips.push(data['instances'][instanceName]['externalIp']);
+    ip = data['instances'][instanceName]['externalIp'];
+    if (ip) {
+      ips.push(ip);
+    }
   }
   return ips;
 };
@@ -396,66 +417,46 @@ Fractal.prototype.drawMap_ = function(canvas, fractalTypeOptions, mapTypeId) {
   return map;
 };
 
-/**
- * A MapType object that throttles image requests
- * @param {Object} opts
- */
-var ThrottledImageMap = function(opts) {
-  this.alt = opts['alt'];
-  this.tileSize = opts['tileSize'];
-  this.name = opts['name'];
-  this.minZoom = opts['minZoom'];
-  this.maxZoom = opts['maxZoom'];
-  this.maxDownloading = opts['maxDownloading'] || 5;
-  this.getTileUrl = opts['getTileUrl'];
 
-  this.loadingTiles = {};
-  this.loadQueue = [];
+/**
+ * Simply shows a summary stat.
+ * @param {Node}   container    The container to render into.
+ * @param {string} display_name User visible description
+ * @param {string} units        Units of metric.
+ * @param {function} stat_name  A function to return the stat value from a JSON data object.
+ */
+var StatDisplay = function(container, display_name, units, stat_func) {
+  this.stat_func = stat_func;
+
+  container = $(container);
+
+  // Render the subtree
+  var stat_container = $('<div>').addClass('stat-container');
+  container.append(stat_container);
+
+  var stat_name_div = $('<div>').addClass('stat-name').text(display_name);
+  stat_container.append(stat_name_div);
+
+  var value_row = $('<div>').addClass('stat-value-row');
+
+  this.value_span = $('<span>').addClass('stat-value').text('--');
+  value_row.append(this.value_span);
+
+  var value_units = $('<span>').addClass('stat-units').text(units);
+  value_row.append(value_units);
+
+  stat_container.append(value_row);
 }
 
-ThrottledImageMap.prototype.getTile = function(tileCoord, zoom, ownerDocument) {
-  var tileDiv = ownerDocument.createElement('div');
-  var tileUrl = this.getTileUrl(tileCoord, zoom);
-  tileDiv.tileUrl = tileUrl;
-  tileDiv.style.width = this.tileSize.width + 'px';
-  tileDiv.style.height = this.tileSize.height + 'px';
-
-  this.addTileToQueue_(tileDiv);
-  this.processQueue_();
-
-  return tileDiv;
-};
-
-ThrottledImageMap.prototype.releaseTile = function(tile) {};
-
-ThrottledImageMap.prototype.addTileToQueue_ = function(tileDiv) {
-  this.loadQueue.push(tileDiv);
-};
-
-ThrottledImageMap.prototype.processQueue_ = function() {
-  while (this.loadQueue.length > 0 && Object.keys(this.loadingTiles).length < this.maxDownloading) {
-    var tileDiv = this.loadQueue.shift();
-    var tileUrl = tileDiv.tileUrl;
-    var img = tileDiv.ownerDocument.createElement('img');
-    img.style.width = this.tileSize.width + 'px';
-    img.style.height = this.tileSize.height + 'px';
-    img.onload = this.onImageLoaded_.bind(this, tileUrl);
-    img.onerror = this.onImageError_.bind(this, tileUrl);
-    console.log('Loading image: ' + tileUrl);
-    img.src = tileUrl;
-    tileDiv.appendChild(img);
-    this.loadingTiles[tileDiv.tileUrl] = tileDiv;
+StatDisplay.prototype.update = function(data) {
+  value = this.stat_func(data);
+  if (value == undefined) {
+    value = '--';
+  } else {
+    value = value.toFixed(1);
   }
+  this.value_span.text(value);
 };
 
-ThrottledImageMap.prototype.onImageLoaded_ = function(tileUrl) {
-  console.log('Image Loaded: ' + tileUrl);
-  delete this.loadingTiles[tileUrl];
-  this.processQueue_();
-};
 
-ThrottledImageMap.prototype.onImageError_ = function(tileUrl) {
-  console.log('Image Error: ' + tileUrl);
-  delete this.loadingTiles[tileUrl];
-  this.processQueue_();
-};
+

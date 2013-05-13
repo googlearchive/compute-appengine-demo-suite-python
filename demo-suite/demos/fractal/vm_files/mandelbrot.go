@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"expvar"
 	"flag"
 	"fmt"
 	"image"
@@ -41,7 +42,23 @@ var (
 	minValue, maxValue float64
 	debugLog           *log.Logger
 	tileServers        []string
+	// requestCounts      expvar.Map
 )
+
+// Publish the host that this data was collected from
+var hostnameVar = expvar.NewString("hostname")
+
+// A Map of URL path -> request count
+var requestCounts = expvar.NewMap("requestCounts")
+
+// A Map of URL path -> total request time in microseconds
+var requestTime = expvar.NewMap("requestTime")
+
+// A Map of 'size' -> request count
+var tileCount = expvar.NewMap("tileCount")
+
+// A Map of 'size' -> total time in microseconds
+var tileTime = expvar.NewMap("tileTime")
 
 const (
 	// The number of iterations of the Mandelbrot calculation.
@@ -75,7 +92,12 @@ const (
 	enableDebugLog = false
 )
 
-func initLogger() {
+func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	hostname, _ := os.Hostname()
+	hostnameVar.Set(hostname)
+
 	if enableDebugLog {
 		debugLog = log.New(os.Stderr, "DEBUG ", log.LstdFlags)
 
@@ -83,11 +105,11 @@ func initLogger() {
 		null, _ := os.Open(os.DevNull)
 		debugLog = log.New(null, "", 0)
 	}
-}
 
-func initMath() {
 	minValue = math.MaxFloat64
 	maxValue = 0
+
+	initColors()
 }
 
 func isPowerOf2(num int) bool {
@@ -146,9 +168,9 @@ func initColors() {
 		numStopsLeft--
 	}
 
-	// for _, c := range colors {
-	// 	debugLog.Printf("%v", c)
-	// }
+	for _, c := range colors {
+		debugLog.Printf("%v", c)
+	}
 }
 
 func tileHandler(w http.ResponseWriter, r *http.Request) {
@@ -166,6 +188,9 @@ func tileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	t0 := time.Now()
+	tileCount.Add(strconv.Itoa(tileSize), 1)
+
 	var b []byte
 	if tileSize > leafTileSize && len(tileServers) > 0 {
 		b = downloadAndCompositeTiles(x, y, z, tileSize)
@@ -175,6 +200,8 @@ func tileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.Write(b)
+
+	tileTime.Add(strconv.Itoa(tileSize), time.Since(t0).Nanoseconds())
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -314,6 +341,7 @@ func renderImage(x, y, z, tileSize int) []byte {
 
 	debugLog.Printf("Rendering Tile x: %v y: %v z: %v tileSize: %v ", x, y, z, tileSize)
 
+	numPixels := 0
 	img := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
 	for tileX := 0; tileX < oversampleTileSize; tileX += pixelOversample {
 		for tileY := 0; tileY < oversampleTileSize; tileY += pixelOversample {
@@ -337,6 +365,12 @@ func renderImage(x, y, z, tileSize int) []byte {
 					uint8(g / (pixelOversample * pixelOversample)),
 					uint8(b / (pixelOversample * pixelOversample)),
 					0xFF})
+
+			// Every 100 pixels yield the goroutine so other stuff can make progress.
+			numPixels++
+			if numPixels%100 == 0 {
+				runtime.Gosched()
+			}
 		}
 	}
 
@@ -351,15 +385,24 @@ func renderImage(x, y, z, tileSize int) []byte {
 	return buf.Bytes()
 }
 
+// A Request object that collects timing information of all intercepted requests as they
+// come in and publishes them to exported vars.
+type RequestStatInterceptor struct {
+	NextHandler http.Handler
+}
+
+func (stats *RequestStatInterceptor) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	requestCounts.Add(req.URL.Path, 1)
+	t0 := time.Now()
+	stats.NextHandler.ServeHTTP(w, req)
+	requestTime.Add(req.URL.Path, time.Since(t0).Nanoseconds())
+}
+
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	initLogger()
-	initColors()
-	initMath()
 
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/tile", tileHandler)
-	http.HandleFunc("/debug/quitquitquit", quitHandler)
+	http.HandleFunc("/debug/quit", quitHandler)
 
 	// Support opening multiple ports so that we aren't bound by HTTP connection
 	// limits in browsers.
@@ -382,11 +425,13 @@ func main() {
 	tileServers = tileServers[:di]
 	log.Printf("Tile Servers: %q", tileServers)
 
+	handler := &RequestStatInterceptor{http.DefaultServeMux}
+
 	for i := 0; i < *numPorts; i++ {
 		portSpec := fmt.Sprintf("0.0.0.0:%v", *portBase+i)
 		go func() {
 			log.Println("Listening on", portSpec)
-			err := http.ListenAndServe(portSpec, nil)
+			err := http.ListenAndServe(portSpec, handler)
 			if err != nil {
 				log.Fatal("ListenAndServe: ", err)
 			}

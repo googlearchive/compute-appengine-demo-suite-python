@@ -39,7 +39,7 @@ MACHINE_TYPE='n1-highcpu-2'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
-HEALTH_CHECK_TIMEOUT = 1
+HEALTH_CHECK_TIMEOUT = 2
 
 VM_FILES = os.path.join(os.path.dirname(__file__), 'vm_files')
 STARTUP_SCRIPT = os.path.join(VM_FILES, 'startup.sh')
@@ -78,6 +78,47 @@ class Fractal(webapp2.RequestHandler):
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
     self.response.out.write(template.render({'demo_name': DEMO_NAME}))
+
+class ServerVarsAggregator(object):
+  """Aggregate stats across multiple servers and produce a summary."""
+
+  def __init__(self):
+    """Constructor for ServerVarsAggregator."""
+    # A map of tile-size -> count
+    self.tile_counts = {}
+    # A map of tile-size -> time
+    self.tile_times = {}
+
+  def aggregate_vars(self, instance_vars):
+    """Integrate instance_vars into the running aggregates.
+
+    Args:
+      instance_vars A parsed JSON object returned from /debug/vars
+    """
+    self._aggregate_map(instance_vars['tileCount'], self.tile_counts)
+    self._aggregate_map(instance_vars['tileTime'], self.tile_times)
+
+  def _aggregate_map(self, src_map, dest_map):
+    """Aggregate one map from src_map into dest_map."""
+    for k, v in src_map.items():
+      dest_map[k] = dest_map.get(k, 0L) + long(v)
+
+  def get_aggregate(self):
+    """Get the overall aggregate, including derived values."""
+    tile_time_avg = {}
+    result = {
+      'tileCount': self.tile_counts.copy(),
+      'tileTime': self.tile_times.copy(),
+      'tileTimeAvgMs': tile_time_avg,
+    }
+    for size, count in self.tile_counts.items():
+      time = self.tile_times.get(size, 0)
+      if time:
+        # Compute average tile time in milliseconds.  The raw time is in
+        # nanoseconds.
+        tile_time_avg[size] = float(time / count) / float(1000*1000)
+        logging.debug('tile-size: %s count: %d time: %d avg: %d', size, count, time, tile_time_avg[size])
+    return result
 
 
 class Instance(RequestHandler):
@@ -126,24 +167,32 @@ class Instance(RequestHandler):
               break
           if ip: break
 
-        # Ping the instance server. If result is 'ok', set status to
-        # SERVING.
+        # Ping the instance server. Grab stats from /debug/vars.
         if ip and instance.status == 'RUNNING':
-          health_url = 'http://%s/health' % ip
+          health_url = 'http://%s/debug/vars' % ip
           logging.debug('Health checking %s', health_url)
           rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
           urlfetch.make_fetch_call(rpc, url=health_url)
           health_rpcs[instance.name] = rpc
 
     # wait for RPCs to complete and update dict as necessary
+    vars_aggregator = ServerVarsAggregator()
+
     for (instance_name, rpc) in health_rpcs.items():
       result = None
       instance_record = instance_dict[instance_name]
       try:
         result = rpc.get_result()
-        if result and result.content.strip() == 'ok':
+        if result and "memstats" in result.content:
           logging.debug('%s healthy!', ip)
           instance_record['status'] = 'SERVING'
+          instance_vars = {}
+          try:
+            instance_vars = json.loads(result.content)
+            instance_record['vars'] = instance_vars
+            vars_aggregator.aggregate_vars(instance_vars)
+          except ValueError as error:
+            logging.error('Error decoding vars json for %s: %s', ip, error)
         else:
           logging.debug('%s unhealthy.  Content: %s', ip, result.content)
       except urlfetch.Error:
@@ -151,6 +200,7 @@ class Instance(RequestHandler):
 
     response_dict = {
       'instances': instance_dict,
+      'vars': vars_aggregator.get_aggregate(),
     }
     self.response.headers['Content-Type'] = 'application/json'
     self.response.out.write(json.dumps(response_dict))
