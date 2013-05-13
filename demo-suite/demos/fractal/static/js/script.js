@@ -223,6 +223,13 @@ Fractal.prototype.MIN_ZOOM_ = 0;
 Fractal.prototype.MAX_ZOOM_ = 30;
 
 /**
+ * The minimum amount of time a server has to be up before we assume the LB is
+ * routing traffic to it.
+ * @type {Number}
+ */
+Fractal.prototype.MIN_UPTIME_ = 5
+
+/**
  * Initialize the UI and check if there are instances already up.
  */
 Fractal.prototype.initialize = function() {
@@ -273,10 +280,28 @@ Fractal.prototype.initialize = function() {
   this.gce_.startContinuousHeartbeat(this.heartbeat.bind(this))
 }
 
+/**
+ * Handle the heartbeat from the GCE object.
+ *
+ * If things are looking good, show the map, otherwise destroy it.
+ *
+ * @param  {Object} data Result of a server status query
+ */
 Fractal.prototype.heartbeat = function(data) {
+  console.log("heartbeat:", data);
+
   this.last_data_ = data;
   this.ips_ = this.getIps_(data);
-  if (data['stateCount']['SERVING'] == this.num_instances_) {
+
+  var map_enabled = false
+  var lbs = data['loadbalancers'];
+  if (lbs && lbs.length > 0) {
+    map_enabled = data['loadbalancer_healthy'];
+  } else if (data['stateCount']['SERVING'] >= this.num_instances_) {
+    map_enabled = true;
+  }
+
+  if (map_enabled) {
     this.mapIt_();
   } else {
     this.stopMap_();

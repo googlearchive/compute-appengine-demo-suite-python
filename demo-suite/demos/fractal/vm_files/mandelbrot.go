@@ -42,7 +42,6 @@ var (
 	minValue, maxValue float64
 	debugLog           *log.Logger
 	tileServers        []string
-	// requestCounts      expvar.Map
 )
 
 // Publish the host that this data was collected from
@@ -92,11 +91,23 @@ const (
 	enableDebugLog = false
 )
 
+// A simple expvar.Var that outputs the time, in seconds, that this server has
+// been running.
+type UptimeVar struct {
+	StartTime time.Time
+}
+
+func (v *UptimeVar) String() string {
+	return strconv.FormatFloat(time.Since(v.StartTime).Seconds(), 'f', 2, 64)
+}
+
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	hostname, _ := os.Hostname()
 	hostnameVar.Set(hostname)
+
+	expvar.Publish("uptime", &UptimeVar{time.Now()})
 
 	if enableDebugLog {
 		debugLog = log.New(os.Stderr, "DEBUG ", log.LstdFlags)

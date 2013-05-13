@@ -93,6 +93,9 @@ class ServerVarsAggregator(object):
     # A map of tile-size -> time
     self.tile_times = {}
 
+    # The uptime of the server that has been up and running the longest.
+    self.max_uptime = 0
+
   def aggregate_vars(self, instance_vars):
     """Integrate instance_vars into the running aggregates.
 
@@ -101,6 +104,7 @@ class ServerVarsAggregator(object):
     """
     self._aggregate_map(instance_vars['tileCount'], self.tile_counts)
     self._aggregate_map(instance_vars['tileTime'], self.tile_times)
+    self.max_uptime = max(self.max_uptime, instance_vars['uptime'])
 
   def _aggregate_map(self, src_map, dest_map):
     """Aggregate one map from src_map into dest_map."""
@@ -114,6 +118,7 @@ class ServerVarsAggregator(object):
       'tileCount': self.tile_counts.copy(),
       'tileTime': self.tile_times.copy(),
       'tileTimeAvgMs': tile_time_avg,
+      'maxUptime': self.max_uptime,
     }
     for size, count in self.tile_counts.items():
       time = self.tile_times.get(size, 0)
@@ -149,6 +154,7 @@ class Instance(RequestHandler):
     health_rpcs = {}
 
     # Convert instance info to dict and check server status.
+    num_running = 0
     instance_dict = {}
     if instances:
       for instance in instances:
@@ -169,11 +175,27 @@ class Instance(RequestHandler):
 
         # Ping the instance server. Grab stats from /debug/vars.
         if ip and instance.status == 'RUNNING':
+          num_running += 1
           health_url = 'http://%s/debug/vars' % ip
           logging.debug('Health checking %s', health_url)
           rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
           urlfetch.make_fetch_call(rpc, url=health_url)
           health_rpcs[instance.name] = rpc
+
+    # Ping through a LBs too.  Only if we get success there do we know we are
+    # really serving.
+    loadbalancers = []
+    lb_rpc = None
+    if instances and len(instances) > 1:
+      loadbalancers = self._get_lb_servers(gce_project)
+    if num_running > 0 and loadbalancers:
+      # Only health check the first LB for now.
+      lb = loadbalancers[0]
+      health_url = 'http://%s/health' % lb
+      logging.debug('Health checking %s', health_url)
+      rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
+      urlfetch.make_fetch_call(rpc, url=health_url)
+      lb_rpc = rpc
 
     # wait for RPCs to complete and update dict as necessary
     vars_aggregator = ServerVarsAggregator()
@@ -198,14 +220,21 @@ class Instance(RequestHandler):
       except urlfetch.Error:
         logging.debug('%s unhealthy', ip)
 
-    loadbalancers = []
-    if len(instances) > 1:
-      loadbalancers = self._get_lb_servers(gce_project)
+    loadbalancer_healthy = False
+    if lb_rpc:
+      result = None
+      try:
+        result = rpc.get_result()
+        if result and "ok" in result.content:
+          loadbalancer_healthy = True
+      except urlfetch.Error:
+        pass
 
     response_dict = {
       'instances': instance_dict,
       'vars': vars_aggregator.get_aggregate(),
       'loadbalancers': loadbalancers,
+      'loadbalancer_healthy': loadbalancer_healthy,
     }
     self.response.headers['Content-Type'] = 'application/json'
     self.response.out.write(json.dumps(response_dict))
