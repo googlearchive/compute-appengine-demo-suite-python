@@ -246,7 +246,7 @@ Fractal.prototype.initialize = function() {
 
 Fractal.prototype.heartbeat = function(data) {
   this.ips_ = this.getIps_(data);
-  if (data['stateCount']['SERVING'] > 0) {
+  if (data['stateCount']['SERVING'] == this.num_instances_) {
     this.mapIt_();
   } else {
     this.stopMap_();

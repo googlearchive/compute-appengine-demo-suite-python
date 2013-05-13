@@ -4,8 +4,10 @@
 * Make it easier to update program on VMs without restarting.  Push new
   program/params and have something in guest quit and be restarted.
 * Add a memcached layer for caching tiles
-* Start exporting/collecting statistics on # of tiles served, avg latency, etc.
 * Pound on the thing with apache bench
 * Run the 16 servers across 2 zones.
 * Put some buttons to jump to points of interest.
 * Add the ability to add/remove instances dynamically
+* Provide a way to reset counters/stats.
+* Improve visual demarcation of 1 vs. many servers.
+* Fix throttled image map to abandon unloaded images when they aren't needed.
