@@ -6,7 +6,7 @@
 
 {% block extra_javascript %}
 <script type="text/javascript">
-  var DEMO_NAME = '{{ demo_name }}';
+var DEMO_NAME = '{{ demo_name }}';
 </script>
 <script type="text/javascript" src="/js/gce.js"></script>
 <script type="text/javascript" src="/js/squares.js"></script>
@@ -16,27 +16,22 @@
 {% endblock %}
 
 {% block content %}
-<h1>
-  Welcome to Fractal Generator!
-</h1>
-
-<p>
-  This demo creates 2 zoomable fractal images using the Maps API. The one
-  on the left is the 'slower' map, with fewer instances being used to serve
-  tiles than the one on the right.
-</p>
-
-<p>
-  <div>
+<div class="row-fluid">
+  <div class="span2 btn-stack">
+    <h2 class="page-header">Fractals
+      <span id="spinner"><i class="icon-spinner icon-spin"></i></span>
+    </h2>
     <a class="btn" id="start">Start VMs</a>
     <a class="btn" id="reset">Stop VMs</a>
+    <hr>
     <a class="btn" id="clearVars">Clear Stats</a>
-    <span id="spinner"><i class="icon-spinner icon-spin icon-2x"></i></span>
   </div>
-</p>
-
-<div class="row-fluid">
-  <div class="span6" id="fractal1"></div>
-  <div class="span6" id="fractal16"></div>
+  <div class="span5" id="fractal1">
+    <h2 class="page-header">Single Instance</h2>
+  </div>
+  <div class="span5" id="fractal16">
+    <h2 class="page-header">Instance Cluster</h2>
+  </div>
 </div>
+
 {% endblock %}

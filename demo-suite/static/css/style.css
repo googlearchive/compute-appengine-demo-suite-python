@@ -12,6 +12,18 @@ h1 {
   margin-left: auto;
 }
 
+.btn-stack .btn {
+  margin-bottom: 5px;
+  margin-right: 10px;
+  display: block;
+}
+
+.btn-stack hr {
+  margin-right: 10px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
 .color-block {
   height: 28px;
   width: 28px;

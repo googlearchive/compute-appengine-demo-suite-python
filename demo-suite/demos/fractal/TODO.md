@@ -8,4 +8,11 @@
 * Run the 16 servers across 2 zones.
 * Put some buttons to jump to points of interest.
 * Add the ability to add/remove instances dynamically
-* Improve visual demarcation of 1 vs. many servers.
+
+Cool points of interest:
+* -56.18426015515269, 87.95310974121094, 13
+* -55.04759738379612, 83.0291748046875, 12
+* -56.20629896160163, 87.77848988771439, 18
+* -56.188367882465826, 87.7214889228344, 18
+* 3.104692113441786, 186.866455078125, 3
+* 39.91121803996906, 204.35609936714172, 21
