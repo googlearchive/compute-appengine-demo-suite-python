@@ -5,3 +5,7 @@
 * Add a memcached layer for caching tiles
 * Pound on the thing with apache bench
 * Run the 16 servers across 2 zones.
+
+* Make errors less visible
+* Debug rare Oauth error
+* Implement client health check of LB state

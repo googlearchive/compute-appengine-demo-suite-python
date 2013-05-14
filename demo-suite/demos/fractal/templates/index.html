@@ -17,10 +17,39 @@ var DEMO_NAME = '{{ demo_name }}';
 
 {% block content %}
 <div class="row-fluid">
-  <div class="span2 btn-stack">
-    <h2 class="page-header">Fractals
+  <div class="span2">
+    <h2>Fractals
       <span id="spinner"><i class="icon-spinner icon-spin"></i></span>
     </h2>
+  </div>
+  <div class="span5">
+    <h2>Single Instance <small>direct connect</small></h2>
+  </div>
+  <div class="span5">
+    <h2>Instance Cluster
+    {% if lb_enabled %}
+      <small>using load balancer<span> <i id="lbsOk" class="icon-ok-sign" style="visibility: hidden"> </i></small>
+    {% else %}
+      <small>direct connect</small>
+    {% endif %}
+    </h2>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span2">
+    <hr>
+  </div>
+  <div class="span5">
+    <hr>
+  </div>
+  <div class="span5">
+    <hr>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span2 btn-stack">
     <a class="btn" id="start">Start VMs</a>
     <a class="btn" id="reset">Stop VMs</a>
     <hr>
@@ -31,13 +60,13 @@ var DEMO_NAME = '{{ demo_name }}';
     {% endif %}
     <a class="btn" id="clearVars">Clear Stats</a>
     <hr>
+    <a class="btn" id="toggleMaps">Show Maps</a>
+    <hr>
     <a class="btn" id="randomPoi">Random POI</a>
   </div>
   <div class="span5" id="fractal1">
-    <h2 class="page-header">Single Instance</h2>
   </div>
   <div class="span5" id="fractalCluster">
-    <h2 class="page-header">Instance Cluster</h2>
   </div>
 </div>
 

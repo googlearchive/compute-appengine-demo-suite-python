@@ -50,7 +50,8 @@ $(document).ready(function() {
   $('#removeServer').click(function() {
     fractalCluster.deltaServers(-1);
   })
-  $('#randomPoi').click(gotoRandomPOI)
+  $('#randomPoi').click(gotoRandomPOI);
+  $('#toggleMaps').click(toggleMaps);
 });
 
 /**
@@ -110,16 +111,47 @@ function gotoRandomPOI () {
   fractal1.map.setZoom(poi.z);
 }
 
+function toggleMaps() {
+  if (fractal1.map) {
+    fractal1.hideMap();
+    fractalCluster.hideMap();
+    $('#toggleMaps').text('Show Maps')
+  } else {
+    fractal1.showMap();
+    fractalCluster.showMap();
+    $('#toggleMaps').text('Hide Maps')
+    addListeners();
+  }
+}
+
+/**
+ * Add listeners to maps so that they zoom and pan in unison.
+ */
+function addListeners() {
+  if (fractal1.map && fractalCluster.map) {
+    // Add listeners to the map on the left so that the zoom and center
+    // is reflected on both maps.
+    google.maps.event.addListener(fractal1.map, 'zoom_changed', function() {
+      var zoom = fractal1.map.getZoom();
+      fractalCluster.map.setZoom(zoom);
+    });
+    google.maps.event.addListener(fractal1.map, 'center_changed', function() {
+      var center = fractal1.map.getCenter();
+      fractalCluster.map.setCenter(center);
+    });
+  }
+};
+
+
 /**
  * Fractal class.
  * @param {Element} container HTML element in which to display the map.
  * @param {string} tag A unique string ('single') used to identify instances
  * @param {number} num_instances Number of instances to start
- * @param {Fractal} slave_fractal Another fractal instance to sync map
  *  position and zoom to.
  * @constructor
  */
-var Fractal = function(container, tag, num_instances, slave_fractal) {
+var Fractal = function(container, tag, num_instances) {
   /**
    * An HTML object that will contain this fractal map.
    * @type {Element}
@@ -168,12 +200,6 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    * @private
    */
   this.num_instances_ = num_instances;
-
-  /**
-   * The other Fractal instance to sync our zoom/position to.
-   * @type {Fractal}
-   */
-  this.slave_fractal_ = slave_fractal;
 
   /**
    * The list of IPs that are serving.
@@ -304,18 +330,13 @@ Fractal.prototype.heartbeat = function(data) {
 
   this.updateSquares_();
 
-  var map_enabled = false
   var lbs = data['loadbalancers'];
   if (lbs && lbs.length > 0) {
-    map_enabled = data['loadbalancer_healthy'];
-  } else if (data['stateCount']['SERVING'] >= this.num_instances_) {
-    map_enabled = true;
-  }
-
-  if (map_enabled) {
-    this.mapIt_();
-  } else {
-    this.stopMap_();
+    if (data['loadbalancer_healthy']) {
+      $('#lbsOk').css('visibility', 'visible');
+    } else {
+      $('#lbsOk').css('visibility', 'hidden');
+    }
   }
 };
 
@@ -415,7 +436,7 @@ Fractal.prototype.updateSquares_ = function() {
 /**
  * Try to cleanup/delete any running map
  */
-Fractal.prototype.stopMap_ = function() {
+Fractal.prototype.hideMap = function() {
   if (this.map) {
     this.map.unbindAll();
     this.map = null
@@ -430,11 +451,10 @@ Fractal.prototype.stopMap_ = function() {
  * Create maps and add listeners to maps.
  * @private
  */
-Fractal.prototype.mapIt_ = function() {
+Fractal.prototype.showMap = function() {
   if (!this.map) {
-    this.stopMap_();
+    this.hideMap();
     this.map = this.prepMap_();
-    this.addListeners_();
   }
 };
 
@@ -479,30 +499,6 @@ Fractal.prototype.prepMap_ = function() {
   var map = this.drawMap_(this.mapContainer_,
   fractalTypeOptions, 'Mandelbrot');
   return map;
-};
-
-/**
- * Add listeners to maps so that they zoom and pan in unison.
- * @private
- */
-Fractal.prototype.addListeners_ = function() {
-  // Add listeners to the map on the left so that the zoom and center
-  // is reflected on both maps.
-  if (this.slave_fractal_) {
-    var that = this;
-    google.maps.event.addListener(this.map, 'zoom_changed', function() {
-      if (that.slave_fractal_.map) {
-        var zoom = that.map.getZoom();
-        that.slave_fractal_.map.setZoom(zoom);
-      }
-    });
-    google.maps.event.addListener(this.map, 'center_changed', function() {
-      if (that.slave_fractal_.map) {
-        var center = that.map.getCenter();
-        that.slave_fractal_.map.setCenter(center);
-      }
-    });
-  }
 };
 
 /**

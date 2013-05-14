@@ -19,8 +19,9 @@ from __future__ import with_statement
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
 import json
-import os
 import logging
+import os
+import time
 
 import lib_path
 import google_cloud.gce as gce
@@ -141,7 +142,7 @@ class Fractal(webapp2.RequestHandler):
         'Error listing instances: ',
         filter='name eq ^%s-.*' % self.instance_prefix())
 
-    # A map of instanceName -> RPC
+    # A map of instanceName -> (ip, RPC)
     health_rpcs = {}
 
     # Convert instance info to dict and check server status.
@@ -167,7 +168,7 @@ class Fractal(webapp2.RequestHandler):
         # Ping the instance server. Grab stats from /debug/vars.
         if ip and instance.status == 'RUNNING':
           num_running += 1
-          health_url = 'http://%s/debug/vars' % ip
+          health_url = 'http://%s/debug/vars?t=%d' % (ip, int(time.time()))
           logging.debug('Health checking %s', health_url)
           rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
           urlfetch.make_fetch_call(rpc, url=health_url)
@@ -176,28 +177,28 @@ class Fractal(webapp2.RequestHandler):
     # Ping through a LBs too.  Only if we get success there do we know we are
     # really serving.
     loadbalancers = []
-    lb_rpc = None
+    lb_rpcs = {}
     if instances and len(instances) > 1:
       loadbalancers = self._get_lb_servers(gce_project)
     if num_running > 0 and loadbalancers:
-      # Only health check the first LB for now.
-      lb = loadbalancers[0]
-      health_url = 'http://%s/health' % lb
-      logging.debug('Health checking %s', health_url)
-      rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
-      urlfetch.make_fetch_call(rpc, url=health_url)
-      lb_rpc = rpc
+      for lb in loadbalancers:
+        health_url = 'http://%s/health?t=%d' % (lb, int(time.time()))
+        logging.debug('Health checking %s', health_url)
+        rpc = urlfetch.create_rpc(deadline = HEALTH_CHECK_TIMEOUT)
+        urlfetch.make_fetch_call(rpc, url=health_url)
+        lb_rpcs[lb] = rpc
 
     # wait for RPCs to complete and update dict as necessary
     vars_aggregator = ServerVarsAggregator()
 
+    # TODO: there is significant duplication here.  Refactor.
     for (instance_name, rpc) in health_rpcs.items():
       result = None
       instance_record = instance_dict[instance_name]
       try:
         result = rpc.get_result()
         if result and "memstats" in result.content:
-          logging.debug('%s healthy!', ip)
+          logging.debug('%s healthy!', instance_name)
           instance_record['status'] = 'SERVING'
           instance_vars = {}
           try:
@@ -205,23 +206,27 @@ class Fractal(webapp2.RequestHandler):
             instance_record['vars'] = instance_vars
             vars_aggregator.aggregate_vars(instance_vars)
           except ValueError as error:
-            logging.error('Error decoding vars json for %s: %s', ip, error)
+            logging.error('Error decoding vars json for %s: %s', instance_name, error)
         else:
-          logging.debug('%s unhealthy.  Content: %s', ip, result.content)
-      except urlfetch.Error:
-        logging.debug('%s unhealthy', ip)
+          logging.debug('%s unhealthy. Content: %s', instance_name, result.content)
+      except urlfetch.Error as error:
+        logging.debug('%s unhealthy: %s', instance_name, str(error))
 
-    loadbalancer_healthy = False
-    if lb_rpc:
+    loadbalancer_healthy = bool(lb_rpcs)
+    for (lb, lb_rpc) in lb_rpcs.items():
       result = None
       try:
         result = lb_rpc.get_result()
         if result and "ok" in result.content:
-          loadbalancer_healthy = True
+          logging.info('LB %s healthy: %s\n%s', lb, result.headers, result.content)
         else:
-          logging.info('LB result not okay: %s, %s', result.status_code, result.content)
+          logging.info('LB %s result not okay: %s, %s', lb, result.status_code, result.content)
+          loadbalancer_healthy = False
+          break
       except urlfetch.Error as error:
-        logging.info('Error fetching LB status: %s', str(error))
+        logging.info('LB %s fetch error: %s', lb, str(error))
+        loadbalancer_healthy = False
+        break
 
     response_dict = {
       'instances': instance_dict,
