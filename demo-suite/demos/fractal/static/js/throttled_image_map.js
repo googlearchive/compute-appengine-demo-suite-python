@@ -51,11 +51,13 @@ ThrottledImageMap.prototype.getTile = function(tileCoord, zoom, ownerDocument) {
   }
 
   var tileDiv = ownerDocument.createElement('div');
+  var tileId = 'tile-' + String(Math.floor( Math.random()*999999));
+  tileDiv.id = tileId;
   tileDiv.tileUrl = tileUrl;
   tileDiv.style.width = this.tileSize.width + 'px';
   tileDiv.style.height = this.tileSize.height + 'px';
 
-  this.tiles[tileUrl] = tileDiv;
+  this.tiles[tileId] = tileDiv;
 
   this.addTileToQueue_(tileDiv);
   this.processQueue_();
@@ -64,19 +66,19 @@ ThrottledImageMap.prototype.getTile = function(tileCoord, zoom, ownerDocument) {
 };
 
 ThrottledImageMap.prototype.releaseTile = function(tileDiv) {
-  var tileUrl = tileDiv.tileUrl;
-  if (tileUrl in this.tiles) {
-    divFromMap = this.tiles[tileUrl];
+  var tileId = tileDiv.id;
+  if (tileId in this.tiles) {
+    divFromMap = this.tiles[tileId];
     if (divFromMap !== tileDiv) {
       console.log('Error: tile release doesn\'t match tile being loaded: '
                   + tileUrl);
       console.log('  releasedTile: ', tileDiv);
       console.log('  tileFromMap: ', divFromMap);
     }
-    console.log('Releasing tile: ' + tileUrl)
-    delete this.tiles[tileUrl];
+    console.log('Releasing tile: ' + tileId + ' url: ' + tileDiv.tileUrl)
+    delete this.tiles[tileId];
 
-    $(divFromMap).empty();
+    $(tileDiv).empty();
   }
 };
 
@@ -89,33 +91,34 @@ ThrottledImageMap.prototype.processQueue_ = function() {
   while (this.loadQueue.length > 0 && Object.keys(this.loadingTiles).length < this.maxDownloading) {
     var tileDiv = this.loadQueue.shift();
     var tileUrl = tileDiv.tileUrl;
+    var tileId = tileDiv.id;
 
-    if (!(tileUrl in this.tiles)) {
+    if (!(tileId in this.tiles)) {
       // This tile is no longer needed so just forget about it and continue.
-      console.log('Ignoring no longer needed: ' + tileUrl);
+      console.log('Ignoring no longer needed: ' + tileId);
       continue;
     }
 
     var img = tileDiv.ownerDocument.createElement('img');
     img.style.width = this.tileSize.width + 'px';
     img.style.height = this.tileSize.height + 'px';
-    img.onload = this.onImageLoaded_.bind(this, tileUrl);
-    img.onerror = this.onImageError_.bind(this, tileUrl);
+    img.onload = this.onImageLoaded_.bind(this, tileId, tileUrl);
+    img.onerror = this.onImageError_.bind(this, tileId, tileUrl);
     console.log('Loading tile: ' + tileUrl);
     img.src = tileUrl;
     tileDiv.appendChild(img);
-    this.loadingTiles[tileDiv.tileUrl] = tileDiv;
+    this.loadingTiles[tileId] = tileDiv;
   }
 };
 
-ThrottledImageMap.prototype.onImageLoaded_ = function(tileUrl) {
-  console.log('Tile loaded: ' + tileUrl);
-  delete this.loadingTiles[tileUrl];
+ThrottledImageMap.prototype.onImageLoaded_ = function(tileId, tileUrl) {
+  console.log('Tile loaded: ' + tileId + ' url: ' + tileUrl);
+  delete this.loadingTiles[tileId];
   this.processQueue_();
 };
 
-ThrottledImageMap.prototype.onImageError_ = function(tileUrl) {
-  console.log('Tile error: ' + tileUrl);
-  delete this.loadingTiles[tileUrl];
+ThrottledImageMap.prototype.onImageError_ = function(tileId, tileUrl) {
+  console.log('Tile error: ' + tileId + ' url: ' + tileUrl);
+  delete this.loadingTiles[tileId];
   this.processQueue_();
 };
