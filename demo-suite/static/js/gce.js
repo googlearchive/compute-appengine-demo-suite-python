@@ -139,7 +139,8 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     type: 'POST',
     url: this.startInstanceUrl_,
     dataType: 'json',
-    statusCode: this.statusCodeResponseFunctions_
+    statusCode: this.statusCodeResponseFunctions_,
+    complete: startOptions.ajaxComplete,
   };
   ajaxRequest.data = {}
   if (startOptions.data) {

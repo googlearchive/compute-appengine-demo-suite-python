@@ -48,8 +48,9 @@ GO_ARGS = '--portBase=80 --numPorts=1'
 GO_TILESERVER_FLAG = '--tileServers='
 
 # TODO: Update these values with your project and LB IP/destinations.
-LB_PROJECT = 'your-project'
-LB_SERVERS = ['a.b.c.d']
+LB_PROJECTS = {
+  'your-project': ['a.b.c.d'],
+}
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -59,29 +60,6 @@ parameters = [
 ]
 data_handler = user_data.DataHandler(DEMO_NAME, parameters)
 
-
-class RequestHandler(webapp2.RequestHandler):
-  """Common request handler for the Fractal Demo."""
-  def InstancePrefix(self):
-    """Return a prefix based on a request/query params."""
-    tag = self.request.get('tag')
-    prefix = DEMO_NAME
-    if tag:
-      prefix = prefix + '-' + tag
-    return prefix
-
-
-class Fractal(webapp2.RequestHandler):
-  """Show main page of Fractal demo."""
-
-  @oauth_decorator.oauth_required
-  @data_handler.data_required
-  def get(self):
-    """Show main page of Fractal demo."""
-
-    template = jinja_environment.get_template(
-        'demos/%s/templates/index.html' % DEMO_NAME)
-    self.response.out.write(template.render({'demo_name': DEMO_NAME}))
 
 class ServerVarsAggregator(object):
   """Aggregate stats across multiple servers and produce a summary."""
@@ -122,7 +100,7 @@ class ServerVarsAggregator(object):
     }
     for size, count in self.tile_counts.items():
       time = self.tile_times.get(size, 0)
-      if time:
+      if time and count:
         # Compute average tile time in milliseconds.  The raw time is in
         # nanoseconds.
         tile_time_avg[size] = float(time / count) / float(1000*1000)
@@ -130,12 +108,25 @@ class ServerVarsAggregator(object):
     return result
 
 
-class Instance(RequestHandler):
-  """Start and list instances."""
+class Fractal(webapp2.RequestHandler):
+  """Fractal demo."""
 
   @oauth_decorator.oauth_required
   @data_handler.data_required
   def get(self):
+    """Show main page of Fractal demo."""
+
+    template = jinja_environment.get_template(
+        'demos/%s/templates/index.html' % DEMO_NAME)
+    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    self.response.out.write(template.render({
+      'demo_name': DEMO_NAME,
+      'lb_enabled': gce_project_id in LB_PROJECTS,
+    }))
+
+  @oauth_decorator.oauth_required
+  @data_handler.data_required
+  def get_instances(self):
     """List instances.
 
     Uses app engine app identity to retrieve an access token for the app
@@ -148,7 +139,7 @@ class Instance(RequestHandler):
         self,
         gce_project.list_instances,
         'Error listing instances: ',
-        filter='name eq ^%s-.*' % self.InstancePrefix())
+        filter='name eq ^%s-.*' % self.instance_prefix())
 
     # A map of instanceName -> RPC
     health_rpcs = {}
@@ -224,11 +215,13 @@ class Instance(RequestHandler):
     if lb_rpc:
       result = None
       try:
-        result = rpc.get_result()
+        result = lb_rpc.get_result()
         if result and "ok" in result.content:
           loadbalancer_healthy = True
-      except urlfetch.Error:
-        pass
+        else:
+          logging.info('LB result not okay: %s, %s', result.status_code, result.content)
+      except urlfetch.Error as error:
+        logging.info('Error fetching LB status: %s', str(error))
 
     response_dict = {
       'instances': instance_dict,
@@ -241,12 +234,8 @@ class Instance(RequestHandler):
 
   @oauth_decorator.oauth_required
   @data_handler.data_required
-  def post(self):
-    """Start instances with the given startup script.
-
-    Uses app engine app identity to retrieve an access token for the app
-    engine service account. No client OAuth required.
-    """
+  def set_instances(self):
+    """Start/stop instances so we have the requested number running."""
 
     gce_project = self._create_gce()
 
@@ -264,14 +253,50 @@ class Instance(RequestHandler):
 
     # Get the list of instances to insert.
     num_instances = int(self.request.get('num_instances'))
-    instances = self._get_instance_list(
+    target = self._get_instance_list(
         gce_project, num_instances, image)
+    target_set = set()
+    target_map = {}
+    for instance in target:
+      target_set.add(instance.name)
+      target_map[instance.name] = instance
 
-    gce_appengine.GceAppEngine().run_gce_request(
+    # Get the list of instances running
+    current = gce_appengine.GceAppEngine().run_gce_request(
         self,
-        gce_project.bulk_insert,
-        'Error inserting instances: ',
-        resources=instances)
+        gce_project.list_instances,
+        'Error listing instances: ',
+        filter='name eq ^%s-.*' % self.instance_prefix())
+    current_set = set()
+    current_map = {}
+    for instance in current:
+      current_set.add(instance.name)
+      current_map[instance.name] = instance
+
+    # Add the new instances
+    to_add_set = target_set - current_set
+    to_add = [target_map[name] for name in to_add_set]
+    if to_add:
+      gce_appengine.GceAppEngine().run_gce_request(
+          self,
+          gce_project.bulk_insert,
+          'Error inserting instances: ',
+          resources=to_add)
+
+    # Remove the old instances
+    to_remove_set = current_set - target_set
+    to_remove = [current_map[name] for name in to_remove_set]
+    if to_remove:
+      gce_appengine.GceAppEngine().run_gce_request(
+          self,
+          gce_project.bulk_delete,
+          'Error deleting instances: ',
+          resources=to_remove)
+
+    logging.info("current_set: %s", current_set)
+    logging.info("target_set: %s", target_set)
+    logging.info("to_add_set: %s", to_add_set)
+    logging.info("to_remove_set: %s", to_remove_set)
 
   @oauth_decorator.oauth_required
   @data_handler.data_required
@@ -279,12 +304,18 @@ class Instance(RequestHandler):
     """Stop instances using the gce_appengine helper class."""
     gce_project = self._create_gce()
     gce_appengine.GceAppEngine().delete_demo_instances(
-        self, gce_project, self.InstancePrefix())
+        self, gce_project, self.instance_prefix())
 
   def _get_lb_servers(self, gce_project):
-    if gce_project.project_id == LB_PROJECT:
-      return LB_SERVERS
-    return []
+    return LB_PROJECTS.get(gce_project.project_id, [])
+
+  def instance_prefix(self):
+    """Return a prefix based on a request/query params."""
+    tag = self.request.get('tag')
+    prefix = DEMO_NAME
+    if tag:
+      prefix = prefix + '-' + tag
+    return prefix
 
   def _create_gce(self):
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
@@ -351,7 +382,7 @@ class Instance(RequestHandler):
 
     instance_names = []
     for i in range(num_instances):
-      instance_names.append('%s-%02d' % (self.InstancePrefix(), i))
+      instance_names.append('%s-%02d' % (self.instance_prefix(), i))
 
     instance_list = []
     for instance_name in instance_names:
@@ -360,7 +391,7 @@ class Instance(RequestHandler):
           machine_type_name=MACHINE_TYPE,
           image_name=image_name,
           image_project_id=image_project_id,
-          tags=[DEMO_NAME, '%s-%d' % (DEMO_NAME, num_instances)],
+          tags=[DEMO_NAME, self.instance_prefix()],
           metadata=self._get_instance_metadata(gce_project, instance_names),
           service_accounts=gce_project.settings['cloud_service_account'])
       instance_list.append(instance)
@@ -370,9 +401,14 @@ class Instance(RequestHandler):
 app = webapp2.WSGIApplication(
     [
         ('/%s' % DEMO_NAME, Fractal),
-        ('/%s/instance' % DEMO_NAME, Instance),
+        webapp2.Route('/%s/instance' % DEMO_NAME,
+          handler=Fractal, handler_method='get_instances',
+          methods=['GET']),
+        webapp2.Route('/%s/instance' % DEMO_NAME,
+          handler=Fractal, handler_method='set_instances',
+          methods=['POST']),
         webapp2.Route('/%s/cleanup' % DEMO_NAME,
-          handler=Instance, handler_method='cleanup',
+          handler=Fractal, handler_method='cleanup',
           methods=['POST']),
         (data_handler.url_path, data_handler.data_handler),
     ], debug=True)

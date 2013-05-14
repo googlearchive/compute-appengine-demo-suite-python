@@ -48,7 +48,8 @@ var Squares = function(container, instanceNames, squareOptions) {
   this.container_ = $(container);
 
   /**
-   * The number of columns in the UI display.
+   * The number of columns in the UI display.  If this is null a value is chosen
+   * automatically.
    * @type {number}
    * @private
    */
@@ -108,15 +109,25 @@ var Squares = function(container, instanceNames, squareOptions) {
   if (squareOptions.cols) {
     this.numCols_ = squareOptions.cols;
   }
-  var numInstances = this.instanceNames_.length;
-  if (!this.numCols_) {
-    this.numCols_ = Math.ceil(Math.sqrt(numInstances));
-    if (this.numCols_ > 25) {
-      this.numCols_ = 25;
-    }
-  }
 };
 
+/**
+ * Set in a new set of instance names.  This will clear the display requiring
+ * the user to draw the squares again and update data.
+ * @param  {Array} instance_names The list of instance names.
+ */
+Squares.prototype.resetInstanceNames = function(instance_names) {
+  this.reset();
+  this.instanceNames_ = instance_names;
+};
+
+/**
+ * Returns the instance names
+ * @return {Array} Returns the instance names.
+ */
+Squares.prototype.getInstanceNames = function() {
+  return this.instanceNames_.slice();
+};
 
 /**
  * Draws the squares on the HTML page.
@@ -144,12 +155,28 @@ Squares.prototype.drawSquares = function() {
 };
 
 /**
+ * Get the number of columns to use.
+ * @return {Number} The number of columns to display.
+ */
+Squares.prototype.getNumCols_ = function() {
+  var numInstances = this.instanceNames_.length;
+  var numCols = this.numCols_;
+  if (!numCols) {
+    numCols = Math.ceil(Math.sqrt(numInstances));
+    if (numCols > 25) {
+      numCols = 25;
+    }
+  }
+  return numCols;
+};
+
+/**
  * Changes the color of the squares according to the instance status. Called
  * during the Gce.heartbeat.
  * @param {Object} updateData The status data returned from the server.
  */
 Squares.prototype.update = function(updateData) {
-  var instanceStatus = updateData['instances'];
+  var instanceStatus = updateData['instances'] || {};
   for (var i = 0; i < this.instanceNames_.length; i++) {
     var instanceName = this.instanceNames_[i];
     var statusClass = null;
@@ -181,10 +208,12 @@ Squares.prototype.reset = function() {
  */
 Squares.prototype.setStatusClass = function(instanceName, color) {
   square = this.squares_[instanceName];
-  for (var status in this.statusClasses_) {
-    square.removeClass(this.statusClasses_[status]);
+  if (square) {
+    for (var status in this.statusClasses_) {
+      square.removeClass(this.statusClasses_[status]);
+    }
+    square.addClass(color);
   }
-  square.addClass(color);
 };
 
 /**

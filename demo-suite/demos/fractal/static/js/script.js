@@ -20,60 +20,59 @@
  */
 
 var fractal1;
-var fractal16;
+var fractalCluster;
 
 $(document).ready(function() {
   $('.btn').button();
   configSpinner();
-  fractal16 = new Fractal($('#fractal16'), FAST_MAP_INSTANCE_TAG,
-    NUM_FAST_MAP_INSTANCES);
-  fractal16.initialize();
-  fractal1 = new Fractal($('#fractal1'), SLOW_MAP_INSTANCE_TAG,
-    NUM_SLOW_MAP_INSTANCES, fractal16);
+  fractalCluster = new Fractal($('#fractalCluster'), CLUSTER_INSTANCE_TAG,
+    NUM_CLUSTER_INSTANCES_START);
+  fractalCluster.initialize();
+  fractal1 = new Fractal($('#fractal1'), SIGNLE_INSTANCE_TAG,
+    1, fractalCluster);
   fractal1.initialize();
 
   $('#start').click(function() {
     fractal1.start();
-    fractal16.start();
+    fractalCluster.start();
   });
   $('#reset').click(function() {
     fractal1.reset();
-    fractal16.reset();
+    fractalCluster.reset();
   });
   $('#clearVars').click(function() {
-    fractal1.clear_vars();
-    fractal16.clear_vars();
+    fractal1.clearVars();
+    fractalCluster.clearVars();
+  })
+  $('#addServer').click(function() {
+    fractalCluster.deltaServers(+1);
+  })
+  $('#removeServer').click(function() {
+    fractalCluster.deltaServers(-1);
   })
   $('#randomPoi').click(gotoRandomPOI)
 });
 
 /**
- * Total number of instances to start for the 'slow' map.
- * @type {number}
- * @constant
- */
-var NUM_SLOW_MAP_INSTANCES = 1;
-
-/**
  * Name for 'slow' map.
  * @type {string}
  * @constant
  */
-var SLOW_MAP_INSTANCE_TAG = 'map1';
+var SIGNLE_INSTANCE_TAG = 'single';
 
 /**
- * Total number of instances to start for the 'slow' map.
+ * Number of instances to start with in the cluster.
  * @type {number}
  * @constant
  */
-var NUM_FAST_MAP_INSTANCES = 16;
+var NUM_CLUSTER_INSTANCES_START = 8;
 
 /**
- * Name for 'slow' map.
+ * Tag for cluster instances.
  * @type {string}
  * @constant
  */
-var FAST_MAP_INSTANCE_TAG = 'map16';
+var CLUSTER_INSTANCE_TAG = 'cluster';
 
 
 /**
@@ -188,6 +187,21 @@ var Fractal = function(container, tag, num_instances, slave_fractal) {
    * @type {Object}
    */
   this.last_data_ = {};
+
+  /**
+   * If this is true then there is a start_instances_ currently running.
+   * @type {Boolean}
+   * @private
+   */
+  this.start_in_progress_ = false;
+
+  /**
+   * If this is true then when the current start_instances_ completes another
+   * should be scheduled.
+   * @type {Boolean}
+   * @private
+   */
+  this.need_another_start_ = false;
 };
 
 /**
@@ -207,27 +221,30 @@ Fractal.prototype.LONGITUDE_ = 157.5;
 /**
  * The default tile size
  * @type {Number}
+ * @private
  */
 Fractal.prototype.TILE_SIZE_ = 128;
 
 /**
  * The minimum zoom on the map
  * @type {Number}
+ * @private
  */
 Fractal.prototype.MIN_ZOOM_ = 0;
 
 /**
  * The maximum zoom of the map.
  * @type {Number}
+ * @private
  */
 Fractal.prototype.MAX_ZOOM_ = 30;
 
 /**
- * The minimum amount of time a server has to be up before we assume the LB is
- * routing traffic to it.
+ * The maximum number of instances we let you start
  * @type {Number}
+ * @private
  */
-Fractal.prototype.MIN_UPTIME_ = 5
+Fractal.prototype.MAX_INSTANCES_ = 16;
 
 /**
  * Initialize the UI and check if there are instances already up.
@@ -242,17 +259,11 @@ Fractal.prototype.initialize = function() {
   var mapRow = $('<div>').addClass('row-fluid').addClass('map-row');
   $(this.container_).append(mapRow);
 
-  // Initialize the squares
-  var instanceNames = [];
-  for (var i = 0; i < this.num_instances_; i++) {
-    instanceNames.push(DEMO_NAME + '-' + this.tag_ + '-' + padNumber(i, 2));
-  }
-
   this.squares_ = new Squares(
-    squaresContainer.get(0), instanceNames, {
+    squaresContainer.get(0), [], {
       cols: 8
     });
-  this.squares_.drawSquares();
+  this.updateSquares_();
 
   var statContainer = $('<div>').addClass('span4');
   squaresRow.append(statContainer);
@@ -262,8 +273,6 @@ Fractal.prototype.initialize = function() {
       var avg_render_time = vars['tileTimeAvgMs'] || {};
       return avg_render_time[this.TILE_SIZE_];
     }.bind(this));
-
-
 
   // DEMO_NAME is set in the index.html template file.
   this.gce_ = new Gce('/' + DEMO_NAME + '/instance',
@@ -293,6 +302,8 @@ Fractal.prototype.heartbeat = function(data) {
   this.last_data_ = data;
   this.ips_ = this.getIps_(data);
 
+  this.updateSquares_();
+
   var map_enabled = false
   var lbs = data['loadbalancers'];
   if (lbs && lbs.length > 0) {
@@ -308,8 +319,8 @@ Fractal.prototype.heartbeat = function(data) {
   }
 };
 
-Fractal.prototype.clear_vars = function() {
-  instances = this.last_data_['instances'] || {};
+Fractal.prototype.clearVars = function() {
+  var instances = this.last_data_['instances'] || {};
   for (var instanceName in instances) {
     ip = instances[instanceName]['externalIp'];
     if (ip) {
@@ -336,14 +347,70 @@ Fractal.prototype.reset = function() {
   this.gce_.stopInstances();
 };
 
+/**
+ * Change the number of target servers by delta
+ * @param  {number} delta The number of servers to change the target by
+ */
+Fractal.prototype.deltaServers = function(delta) {
+  this.num_instances_ += delta;
+  this.num_instances_ = Math.max(this.num_instances_, 0);
+  this.num_instances_ = Math.min(this.num_instances_, this.MAX_INSTANCES_);
+
+  this.updateSquares_();
+  this.startInstances_();
+};
+
+/**
+ * Start/stop any instances that need to be started/stopped.  This won't have
+ * more than one start API call outstanding at a time.  If one is already
+ * running it will remember an start another after that one is complete.
+ */
 Fractal.prototype.startInstances_ = function() {
-  var that = this;
-  this.gce_.startInstances(that.num_instances_, {
-    data: {
-      'num_instances': that.num_instances_
-    },
-  })
+  if (this.start_in_progress_) {
+    this.need_another_start_ = true;
+  } else {
+    this.start_in_progress_ = true;
+    this.gce_.startInstances(this.num_instances_, {
+      data: {
+        'num_instances': this.num_instances_
+      },
+      ajaxComplete: function() {
+        this.start_in_progress_ = false;
+        if (this.need_another_start_) {
+          this.need_another_start_ = false;
+          this.startInstances_();
+        }
+      }.bind(this),
+    })
+  }
 }
+
+Fractal.prototype.updateSquares_ = function() {
+  // Initialize the squares to the target instances and any existing instances
+  var instanceMap = {};
+  for (var i = 0; i < this.num_instances_; i++) {
+    var instanceName = DEMO_NAME + '-' + this.tag_ + '-' + padNumber(i, 2);
+    instanceMap[instanceName] = 1;
+  }
+  if (this.last_data_) {
+    var current_instances = this.last_data_['instances'] || {};
+    for (var instanceName in current_instances) {
+      instanceMap[instanceName] = 1;
+    }
+  }
+  var instanceNames = Object.keys(instanceMap).sort();
+
+  // Get the current squares and then compare.
+  var currentSquares = this.squares_.getInstanceNames().sort()
+
+  if (!arraysEqual(instanceNames, currentSquares)) {
+    this.squares_.resetInstanceNames(instanceNames);
+    this.squares_.drawSquares();
+    if (this.last_data_) {
+      this.squares_.update(this.last_data_)
+    }
+  }
+};
 
 /**
  * Try to cleanup/delete any running map

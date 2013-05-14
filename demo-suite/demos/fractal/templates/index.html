@@ -24,6 +24,11 @@ var DEMO_NAME = '{{ demo_name }}';
     <a class="btn" id="start">Start VMs</a>
     <a class="btn" id="reset">Stop VMs</a>
     <hr>
+    {% if lb_enabled %}
+      <a class="btn" id="addServer">Add a VM</a>
+      <a class="btn" id="removeServer">Kill a VM</a>
+      <hr>
+    {% endif %}
     <a class="btn" id="clearVars">Clear Stats</a>
     <hr>
     <a class="btn" id="randomPoi">Random POI</a>
@@ -31,7 +36,7 @@ var DEMO_NAME = '{{ demo_name }}';
   <div class="span5" id="fractal1">
     <h2 class="page-header">Single Instance</h2>
   </div>
-  <div class="span5" id="fractal16">
+  <div class="span5" id="fractalCluster">
     <h2 class="page-header">Instance Cluster</h2>
   </div>
 </div>
