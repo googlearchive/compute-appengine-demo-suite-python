@@ -19,6 +19,7 @@ h1 {
 }
 
 .btn-stack hr {
+  border-top: 2px solid #eee;
   margin-right: 10px;
   margin-top: 10px;
   margin-bottom: 10px;
