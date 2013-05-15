@@ -74,9 +74,12 @@ class GceProject(object):
 
     self.gce_url = '%s/%s' % (GCE_URL, self.settings['compute']['api_version'])
 
+    discovery_doc_path = 'discovery/compute/%s.json' % self.settings['compute']['api_version']
+    discovery_doc = open(discovery_doc_path, 'r').read()
+
     auth_http = self._auth_http(credentials)
-    self.service = discovery.build(
-        API, self.settings['compute']['api_version'], http=auth_http)
+    self.service = discovery.build_from_document(
+        discovery_doc, self.settings['compute']['api_version'], http=auth_http)
 
     self.project_id = project_id
     if not self.project_id:
