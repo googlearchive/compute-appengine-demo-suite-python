@@ -4,7 +4,7 @@ set -o xtrace
 PROJECT=your-project
 ZONE=us-central1-a
 GCUTIL="gcutil --project=$PROJECT"
-IMAGE=fractal-demo-image
+IMAGE=projects/centos-cloud/global/images/centos-6-v20130515
 
 # Create an array of PD images from an image.
 set +o xtrace
