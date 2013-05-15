@@ -37,6 +37,9 @@ $(document).ready(function() {
     fractalCluster.start();
   });
   $('#reset').click(function() {
+    if (fractal1.map) {
+      toggleMaps();
+    }
     fractal1.reset();
     fractalCluster.reset();
   });

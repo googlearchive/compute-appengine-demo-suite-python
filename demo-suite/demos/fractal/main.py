@@ -40,7 +40,7 @@ MACHINE_TYPE='n1-highcpu-2'
 FIREWALL = 'www-fractal'
 FIREWALL_DESCRIPTION = 'Fractal Demo Firewall'
 GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
-HEALTH_CHECK_TIMEOUT = 2
+HEALTH_CHECK_TIMEOUT = 1
 
 VM_FILES = os.path.join(os.path.dirname(__file__), 'vm_files')
 STARTUP_SCRIPT = os.path.join(VM_FILES, 'startup.sh')
@@ -244,22 +244,14 @@ class Fractal(webapp2.RequestHandler):
 
     gce_project = self._create_gce()
 
-    # Create the firewall if it doesn't exist.
-    firewalls = gce_project.list_firewalls()
-    firewall_names = [firewall.name for firewall in firewalls]
-    if not FIREWALL in firewall_names:
-      firewall = gce.Firewall(
-          name=FIREWALL,
-          target_tags=[DEMO_NAME],
-          description=FIREWALL_DESCRIPTION)
-      gce_project.insert(firewall)
-
+    self._setup_firewall(gce_project)
     image = self._get_image(gce_project)
+    disks = self._get_disks(gce_project)
 
     # Get the list of instances to insert.
     num_instances = int(self.request.get('num_instances'))
     target = self._get_instance_list(
-        gce_project, num_instances, image)
+        gce_project, num_instances, image, disks)
     target_set = set()
     target_map = {}
     for instance in target:
@@ -329,6 +321,17 @@ class Fractal(webapp2.RequestHandler):
                           project_id=gce_project_id,
                           zone_name=gce_zone_name)
 
+  def _setup_firewall(self, gce_project):
+    "Create the firewall if it doesn't exist."
+    firewalls = gce_project.list_firewalls()
+    firewall_names = [firewall.name for firewall in firewalls]
+    if not FIREWALL in firewall_names:
+      firewall = gce.Firewall(
+          name=FIREWALL,
+          target_tags=[DEMO_NAME],
+          description=FIREWALL_DESCRIPTION)
+      gce_project.insert(firewall)
+
   def _get_image(self, gce_project):
     """Returns the appropriate image to use.  def _has_custom_image(self, gce_project):
 
@@ -341,6 +344,16 @@ class Fractal(webapp2.RequestHandler):
     if images:
       return (gce_project.project_id, CUSTOM_IMAGE)
     return ('google', None)
+
+  def _get_disks(self, gce_project):
+    """Get boot disks for VMs."""
+    disks_array = gce_project.list_disks(
+      filter='name eq ^boot-%s-.*' % self.instance_prefix())
+
+    disks = {}
+    for d in disks_array:
+      disks[d.name] = d
+    return disks
 
   def _get_instance_metadata(self, gce_project, instance_names):
     """The metadata values to pass into the instance."""
@@ -355,8 +368,10 @@ class Fractal(webapp2.RequestHandler):
 
     # Try and use LBs if we have any.  But only do that if we have more than one
     # instance.
-    if instance_names and len(instance_names) > 1:
-      tile_servers = self._get_lb_servers(gce_project)
+    if instance_names:
+      tile_servers = ''
+      if len(instance_names) > 1:
+        tile_servers = self._get_lb_servers(gce_project)
       if not tile_servers:
         tile_servers = instance_names
       tile_servers = ','.join(tile_servers)
@@ -371,19 +386,19 @@ class Fractal(webapp2.RequestHandler):
       metadata.append({'key': k, 'value': v})
     return metadata
 
-  def _get_instance_list(self, gce_project, num_instances, image):
+  def _get_instance_list(self, gce_project, num_instances, image, disks):
     """Get a list of instances to start.
 
     Args:
       gce_project: An instance of gce.GceProject.
       num_instances: The number of instances to start.
       image: tuple with (project_name, image_name) for the image to use.
+      disks: A dictionary of disk_name -> disk resources
 
     Returns:
       A list of gce.Instances.
     """
 
-    image_project_id, image_name = image
 
     instance_names = []
     for i in range(num_instances):
@@ -391,11 +406,27 @@ class Fractal(webapp2.RequestHandler):
 
     instance_list = []
     for instance_name in instance_names:
+      disk_name = 'boot-%s' % instance_name
+      disk = disks.get(disk_name, None)
+      disk_mounts = []
+      image_project_id = None
+      image_name = None
+      kernel = None
+      if disk:
+        dm = gce.DiskMount(disk=disk, boot=True)
+        kernel = gce_project.settings['compute']['kernel']
+        disk_mounts.append(dm)
+      else:
+        image_project_id, image_name = image
+
+
       instance = gce.Instance(
           name=instance_name,
           machine_type_name=MACHINE_TYPE,
           image_name=image_name,
           image_project_id=image_project_id,
+          disk_mounts=disk_mounts,
+          kernel=kernel,
           tags=[DEMO_NAME, self.instance_prefix()],
           metadata=self._get_instance_metadata(gce_project, instance_names),
           service_accounts=gce_project.settings['cloud_service_account'])
