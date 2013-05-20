@@ -28,7 +28,7 @@ instructions.
        "client_id": "24043....apps.googleusercontent.com",
        "client_secret": "iPVXC5...xVz",
        "redirect_uris": ["http://localhost:8080/oauth2callback",
-                         "http://<your-app-id>.appspot.com/oauth2callback"],
+                         "http://&lt;your-app-id&gt;.appspot.com/oauth2callback"],
        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
        "token_uri": "https://accounts.google.com/o/oauth2/token"
      }
@@ -71,6 +71,16 @@ When adding new dependencies do the following:
 1. Add them to the list here
 2. Add them to the `download_dependencies.sh` script.
 3. Add them to `demo-suite/lib_path.py`
+
+## Fractal Demo
+
+### Load Balancing
+The fractal demo can use load balancing.  However, the feature is in preview and the API is under active development.  As such, there are some pieces missing that will be filled in as the feature reaches maturity.
+
+If load balancing **is** set up, it will work to forward all connections to an IP address to a set of VMs with a specific tag (fractal-cluster).  Currently, the projects that support this are hard coded in the `demo-suite/demos/fractal/main.py` along with the IP/hostnames for the load balancer.
+
+### Boot from PD
+If you initialize a set of boot PDs, they will be detected and used instead of booting from scratch disks.  Do do this run the `demo-suite/demos/fractal/createpds.sh` script.  You'll have to update it to point to your project.
 
 
 [1]: http://gce-demos.appspot.com

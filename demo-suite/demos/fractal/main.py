@@ -212,6 +212,7 @@ class Fractal(webapp2.RequestHandler):
       except urlfetch.Error as error:
         logging.debug('%s unhealthy: %s', instance_name, str(error))
 
+    # Check health status through the load balancer.
     loadbalancer_healthy = bool(lb_rpcs)
     for (lb, lb_rpc) in lb_rpcs.items():
       result = None
