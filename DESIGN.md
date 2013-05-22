@@ -7,6 +7,11 @@ Generally it consists of a python driver that launches and manages information.
 A simple GCE library is included in `lib/google_cloud/gce.py`.  This is built on
 the [Google API Python Library][python-lib].
 
+The discovery document is checked in (`demo-
+suite/discovery/compute/v1beta14.json`).  When updating to a new version a new
+discovery doc will have to be fetched and used.  An easy way to do this is to
+grab it from the gcutil tarball.
+
 Individual demo handlers should have a method that returns a JSON dictionary of
 instance state and data.  It might look like this:
 
