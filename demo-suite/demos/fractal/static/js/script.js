@@ -89,11 +89,11 @@ function configSpinner() {
   $('#spinner')
     .css('visibility', 'hidden')
     .ajaxStart(function() {
-    $('#spinner').css('visibility', '');
-  })
+      $('#spinner').css('visibility', '');
+    })
     .ajaxStop(function() {
-    $('#spinner').css('visibility', 'hidden');
-  });
+      $('#spinner').css('visibility', 'hidden');
+    });
 }
 
 var POINTS_OF_INTEREST = [
