@@ -34,7 +34,7 @@ import gce_exception as error
 
 API = 'compute'
 GCE_URL = 'https://www.googleapis.com/%s' % API
-GOOGLE_PROJECT = 'google'
+GOOGLE_PROJECT = 'centos-cloud'
 
 
 class GceProject(object):

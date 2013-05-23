@@ -80,7 +80,7 @@ The fractal demo can use load balancing.  However, the feature is in preview and
 If load balancing **is** set up, it will work to forward all connections to an IP address to a set of VMs with a specific tag (fractal-cluster).  Currently, the projects that support this are hard coded in the `demo-suite/demos/fractal/main.py` along with the IP/hostnames for the load balancer.
 
 ### Boot from PD
-If you initialize a set of boot PDs, they will be detected and used instead of booting from scratch disks.  Do do this run the `demo-suite/demos/fractal/createpds.sh` script.  You'll have to update it to point to your project.
+If you initialize a set of boot PDs, they will be detected and used instead of booting from scratch disks.  To do this run the `demo-suite/demos/fractal/createpds.sh` script.  You'll have to update it to point to your project.
 
 
 [1]: http://gce-demos.appspot.com
