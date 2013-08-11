@@ -169,6 +169,11 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
  */
 Gce.prototype.stopInstances = function(callback) {
   var data = {}
+
+  if (this.gceUiOptions.timer.start) {
+    this.gceUiOptions.timer.start();
+  }
+
   if (this.commonQueryData_) {
     $.extend(data, this.commonQueryData_)
   }

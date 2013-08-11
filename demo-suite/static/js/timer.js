@@ -51,6 +51,14 @@ Timer.prototype.timerInterval_ = null;
 Timer.prototype.TIMER_INTERVAL_TIME_ = 1000;
 
 /**
+ * The timer state.
+ * @type {boolean}
+ * @private
+ */
+Timer.prototype.running_ = false;
+
+Timer.prototype.TIMER_INTERVAL_TIME_ = 1000;
+/**
  * The elapsed seconds.
  * @type {number}
  * @private
@@ -63,19 +71,32 @@ Timer.prototype.seconds_ = 0;
  */
 Timer.prototype.start = function() {
   var that = this;
-  this.timerInterval_ = setInterval(function() {
-    that.tick_();
-  }, this.TIMER_INTERVAL_TIME_);
-  this.tick_();
+
+  // Start timer if not already running.
+  if (!Timer.prototype.running_) { 
+    this.timerInterval_ = setInterval(function() {
+      that.tick_();
+    }, this.TIMER_INTERVAL_TIME_);
+    this.tick_();
+    Timer.prototype.running_ = true;
+  }
 };
 
 /**
  * Stop the timer.
  */
 Timer.prototype.stop = function() {
-  this.seconds_ = 0;
   clearInterval(this.timerInterval_);
+  this.seconds_ = 0;
+  Timer.prototype.running_ = false;
 };
+
+/**
+ * Set starting offset.
+ */
+Timer.prototype.setOffset = function(offset) {
+  this.seconds_ = offset;
+}
 
 /**
  * Increment the timer every second.

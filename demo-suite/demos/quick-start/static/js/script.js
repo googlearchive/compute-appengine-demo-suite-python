@@ -25,10 +25,18 @@ QuickStart.prototype.initialize = function() {
   var gce = new Gce('/' + DEMO_NAME + '/instance',
       '/' + DEMO_NAME + '/instance',
       '/' + DEMO_NAME + '/cleanup');
+
   gce.getInstanceStates(function(data) {
     var numInstances = parseInt($('#num-instances').val(), 10);
     var currentInstances = data['stateCount']['TOTAL'];
     if (currentInstances != 0) {
+      // Alert user we're in recovery mode.
+      //if (numInstances == 0) {
+        //alert('Instances stopping, waiting for completion');
+      //} else {
+        //alert('Instances starting, waiting for completion');
+      //}
+
       // Instance are already running so we're in recovery mode. To draw 
       // grid, maintain counter, and start status polling, we simulate 
       // start click with running current number of instances requested.
@@ -37,6 +45,7 @@ QuickStart.prototype.initialize = function() {
       var startTime = parseInt($('#start-time').val(), 10);
       var currentTime = Math.round(new Date().getTime() / 1000)
       var elapsedTime = currentTime - startTime;
+      Timer.prototype.setOffset(elapsedTime);
 
       $('#num-instances').val(currentInstances);
       Recovering = true;
@@ -48,13 +57,6 @@ QuickStart.prototype.initialize = function() {
       // because duplicate starts can cause confusion and perf problems.
       $('#start').addClass('disabled');
       $('#reset').removeClass('disabled');
-
-      // Alert user we're in recovery mode.
-      if (numInstances == 0) {
-        alert('Instances stopping, waiting for completion');
-      } else {
-        alert('Instances starting, waiting for completion');
-      }
     }
   });
 
