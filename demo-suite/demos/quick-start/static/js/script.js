@@ -34,6 +34,10 @@ QuickStart.prototype.initialize = function() {
       // start click with running current number of instances requested.
       // We also set Recovering flag to true to inhibit sending of start 
       // request to GCE. 
+      var startTime = parseInt($('#start-time').val(), 10);
+      var currentTime = Math.round(new Date().getTime() / 1000)
+      var elapsedTime = currentTime - startTime;
+
       $('#num-instances').val(currentInstances);
       Recovering = true;
       $('#start').click();

@@ -25,6 +25,7 @@ import google_cloud.gce_appengine as gce_appengine
 import google_cloud.oauth as oauth
 import jinja2
 import oauth2client.appengine as oauth2client
+import time
 import user_data
 import webapp2
 
@@ -44,28 +45,24 @@ class Objective(ndb.Model):
   targetVMs = ndb.IntegerProperty()
 
   # Date/time when current request was launched or None if no work in progess.
-  startTime = ndb.DateTimeProperty(auto_now_add=True)
+  startTime = ndb.IntegerProperty()
 
 def getObjective(project_id):
-  targetVMs = 0
   key = ndb.Key("Objective", project_id)
-  objective = key.get()
-  if objective: 
-    targetVMs = objective.targetVMs
-  return targetVMs
+  return key.get()
 
 @ndb.transactional
-
 def updateObjective(project_id, targetVMs):
   key = ndb.Key("Objective", project_id)
   objective = key.get()
   if not objective: 
     logging.info('objective not found, creating new for project ' + project_id)
-    objective = Objective(key=key, targetVMs=targetVMs)
+    objective = Objective(key=key)
   else:
-    logging.info('objective found for project ' + project_id + 's/' + 
+    logging.info('objective found for project ' + project_id + ' s/' + 
                  str(objective.targetVMs) + '/' + str(targetVMs) + '/')
   objective.targetVMs = targetVMs
+  objective.startTime = int(time.time())
   objective.put()
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
@@ -85,13 +82,17 @@ class QuickStart(webapp2.RequestHandler):
   def get(self):
     """Displays the main page for the Quick Start demo. Auth required."""
 
-    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
-    targetVMs = getObjective(gce_project_id)
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
+    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    objective = getObjective(gce_project_id)
+    (targetVMs, startTime) = (0, 0)
+    if objective:
+      (targetVMs, startTime) = (objective.targetVMs, objective.startTime)
     variables = {
       'demo_name': DEMO_NAME,
-      'targetVMs': targetVMs
+      'targetVMs': targetVMs,
+      'startTime': startTime
     }
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
