@@ -19,6 +19,7 @@ from __future__ import with_statement
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
 import lib_path
+import logging
 import google_cloud.gce as gce
 import google_cloud.gce_appengine as gce_appengine
 import google_cloud.oauth as oauth
@@ -27,9 +28,45 @@ import oauth2client.appengine as oauth2client
 import user_data
 import webapp2
 
+from google.appengine.ext import ndb
 from google.appengine.api import users
 
 DEMO_NAME = 'quick-start'
+
+class Objective(ndb.Model):
+  """ Keeps track of work in progress"""
+  # Disable caching of objective.
+  _use_memcache = False
+  _use_cache = False
+
+  # Desired number of VMs and start time. This might be >0 for a start
+  # request or 0 for a reset request.
+  targetVMs = ndb.IntegerProperty()
+
+  # Date/time when current request was launched or None if no work in progess.
+  startTime = ndb.DateTimeProperty(auto_now_add=True)
+
+def getObjective(project_id):
+  targetVMs = 0
+  key = ndb.Key("Objective", project_id)
+  objective = key.get()
+  if objective: 
+    targetVMs = objective.targetVMs
+  return targetVMs
+
+@ndb.transactional
+
+def updateObjective(project_id, targetVMs):
+  key = ndb.Key("Objective", project_id)
+  objective = key.get()
+  if not objective: 
+    logging.info('objective not found, creating new for project ' + project_id)
+    objective = Objective(key=key, targetVMs=targetVMs)
+  else:
+    logging.info('objective found for project ' + project_id + 's/' + 
+                 str(objective.targetVMs) + '/' + str(targetVMs) + '/')
+  objective.targetVMs = targetVMs
+  objective.put()
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -48,9 +85,14 @@ class QuickStart(webapp2.RequestHandler):
   def get(self):
     """Displays the main page for the Quick Start demo. Auth required."""
 
+    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    targetVMs = getObjective(gce_project_id)
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
-    variables = {'demo_name': DEMO_NAME}
+    variables = {
+      'demo_name': DEMO_NAME,
+      'targetVMs': targetVMs
+    }
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
     self.response.out.write(template.render(variables))
@@ -96,14 +138,17 @@ class Instance(webapp2.RequestHandler):
         'Error inserting instances: ',
         resources=instances)
 
+    # Record objective in datastore so we can recover work in progress.
+    updateObjective(gce_project_id, num_instances)
+
     if response:
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('starting cluster')
 
 
 class Cleanup(webapp2.RequestHandler):
-  """Stop instances."""
 
+  """Stop instances."""
   @data_handler.data_required
   def post(self):
     """Stop instances using the gce_appengine helper class."""
@@ -117,6 +162,8 @@ class Cleanup(webapp2.RequestHandler):
     gce_appengine.GceAppEngine().delete_demo_instances(
         self, gce_project, DEMO_NAME)
 
+    # Record reset objective in datastore so we can recover work in progress.
+    updateObjective(gce_project_id, 0)
 
 app = webapp2.WSGIApplication(
     [

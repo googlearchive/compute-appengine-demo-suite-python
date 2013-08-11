@@ -135,21 +135,23 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     }
   }
 
-  var ajaxRequest = {
-    type: 'POST',
-    url: this.startInstanceUrl_,
-    dataType: 'json',
-    statusCode: this.statusCodeResponseFunctions_,
-    complete: startOptions.ajaxComplete,
-  };
-  ajaxRequest.data = {}
-  if (startOptions.data) {
-    ajaxRequest.data = startOptions.data;
+  if (!Recovering) {
+    var ajaxRequest = {
+      type: 'POST',
+      url: this.startInstanceUrl_,
+      dataType: 'json',
+      statusCode: this.statusCodeResponseFunctions_,
+      complete: startOptions.ajaxComplete,
+    };
+    ajaxRequest.data = {}
+    if (startOptions.data) {
+      ajaxRequest.data = startOptions.data;
+    }
+    if (this.commonQueryData_) {
+      $.extend(ajaxRequest.data, this.commonQueryData_)
+    }
+    $.ajax(ajaxRequest);
   }
-  if (this.commonQueryData_) {
-    $.extend(ajaxRequest.data, this.commonQueryData_)
-  }
-  $.ajax(ajaxRequest);
   if (!this.doContinuousHeartbeat_
     && (this.gceUiOptions || startOptions.callback)) {
     var terminalState = 'RUNNING'

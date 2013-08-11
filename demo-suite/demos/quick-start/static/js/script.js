@@ -16,6 +16,8 @@ $(document).ready(function() {
  */
 var QuickStart = function() { };
 
+var Recovering = false;
+
 /**
  * Initialize the UI and check if there are instances already up.
  */
@@ -24,10 +26,31 @@ QuickStart.prototype.initialize = function() {
       '/' + DEMO_NAME + '/instance',
       '/' + DEMO_NAME + '/cleanup');
   gce.getInstanceStates(function(data) {
-    if (data['stateCount']['TOTAL'] != 0) {
+    var numInstances = parseInt($('#num-instances').val(), 10);
+    var currentInstances = data['stateCount']['TOTAL'];
+    if (currentInstances != 0) {
+      // Instance are already running so we're in recovery mode. To draw 
+      // grid, maintain counter, and start status polling, we simulate 
+      // start click with running current number of instances requested.
+      // We also set Recovering flag to true to inhibit sending of start 
+      // request to GCE. 
+      $('#num-instances').val(currentInstances);
+      Recovering = true;
+      $('#start').click();
+      Recovering = false;
+      $('#num-instances').val(numInstances);
+
+      // In recovery mode, resets are ok but don't let user resend start,
+      // because duplicate starts can cause confusion and perf problems.
       $('#start').addClass('disabled');
       $('#reset').removeClass('disabled');
-      alert('Some instances are already running! Hit reset.');
+
+      // Alert user we're in recovery mode.
+      if (numInstances == 0) {
+        alert('Instances stopping, waiting for completion');
+      } else {
+        alert('Instances starting, waiting for completion');
+      }
     }
   });
 
@@ -46,18 +69,20 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
 
   var that = this;
   $('#start').click(function() {
-    $('#start').addClass('disabled');
-
     // Get the number of instances entered by the user.
     var numInstances = parseInt($('#num-instances').val(), 10);
     if (numInstances > 1000) {
       alert('Max instances is 1000, starting 1000 instead.');
       numInstances = 1000;
-    }
-    if (numInstances <= 0) {
+    } else if (numInstances < 0) {
       alert('At least one instance needs to be started, starting 1 instead.');
       numInstances = 1;
+    } else if (numInstances === 0) {
+      return;
     }
+
+    // Request started, disable start button to avoid user confusion.
+    $('#start').addClass('disabled');
 
     var instanceNames = [];
     for (var i = 0; i < numInstances; i++) {
@@ -86,6 +111,7 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
   // Initialize reset button click event to stop instances.
   $('#reset').click(function() {
     that.counter_.targetState = 'TOTAL';
+    $('#num-instances').val(0);
     gce.stopInstances(function() {
       $('#start').removeClass('disabled');
       $('#reset').addClass('disabled');
