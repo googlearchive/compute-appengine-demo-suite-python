@@ -42,7 +42,9 @@ QuickStart.prototype.initialize = function() {
       // status polling, we simulate start click with current number of 
       // instances requested, but we set Recovering flag to true to 
       // inhibit sending of start request to GCE.
-      $('#num-instances').val(currentInstances);
+      if (numInstances == 0) {
+        $('#num-instances').val(currentInstances);
+      }
       Recovering = true;
       $('#start').click();
       Recovering = false;

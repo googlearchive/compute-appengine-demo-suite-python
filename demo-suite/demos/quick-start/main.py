@@ -56,6 +56,7 @@ def updateObjective(project_id, targetVMs):
   objective = getObjective(project_id)
   if not objective: 
     logging.info('objective not found, creating new, project=' + project_id)
+    key = ndb.Key("Objective", project_id)
     objective = Objective(key=key)
   objective.targetVMs = targetVMs
   objective.startTime = int(time.time())
