@@ -57,7 +57,6 @@ Timer.prototype.TIMER_INTERVAL_TIME_ = 1000;
  */
 Timer.prototype.running_ = false;
 
-Timer.prototype.TIMER_INTERVAL_TIME_ = 1000;
 /**
  * The elapsed seconds.
  * @type {number}
@@ -86,8 +85,8 @@ Timer.prototype.start = function() {
  * Stop the timer.
  */
 Timer.prototype.stop = function() {
-  clearInterval(this.timerInterval_);
   this.seconds_ = 0;
+  clearInterval(this.timerInterval_);
   Timer.prototype.running_ = false;
 };
 

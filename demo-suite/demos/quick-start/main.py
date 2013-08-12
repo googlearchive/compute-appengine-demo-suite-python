@@ -35,16 +35,16 @@ from google.appengine.api import users
 DEMO_NAME = 'quick-start'
 
 class Objective(ndb.Model):
-  """ Keeps track of work in progress"""
+  """ This data model keeps track of work in progress. """
   # Disable caching of objective.
   _use_memcache = False
   _use_cache = False
 
-  # Desired number of VMs and start time. This might be >0 for a start
-  # request or 0 for a reset request.
+  # Desired number of VMs and start time. This will be >0 for a start
+  # request or 0 for a reset/stop request.
   targetVMs = ndb.IntegerProperty()
 
-  # Date/time when current request was launched or None if no work in progess.
+  # Epoch time when last/current request was stated.
   startTime = ndb.IntegerProperty()
 
 def getObjective(project_id):
@@ -53,14 +53,10 @@ def getObjective(project_id):
 
 @ndb.transactional
 def updateObjective(project_id, targetVMs):
-  key = ndb.Key("Objective", project_id)
-  objective = key.get()
+  objective = getObjective(project_id)
   if not objective: 
-    logging.info('objective not found, creating new for project ' + project_id)
+    logging.info('objective not found, creating new, project=' + project_id)
     objective = Objective(key=key)
-  else:
-    logging.info('objective found for project ' + project_id + ' s/' + 
-                 str(objective.targetVMs) + '/' + str(targetVMs) + '/')
   objective.targetVMs = targetVMs
   objective.startTime = int(time.time())
   objective.put()
@@ -84,11 +80,15 @@ class QuickStart(webapp2.RequestHandler):
 
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
+
+    targetVMs = 0
+    startTime = 0
+
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
     objective = getObjective(gce_project_id)
-    (targetVMs, startTime) = (0, 0)
     if objective:
       (targetVMs, startTime) = (objective.targetVMs, objective.startTime)
+
     variables = {
       'demo_name': DEMO_NAME,
       'targetVMs': targetVMs,
@@ -148,8 +148,8 @@ class Instance(webapp2.RequestHandler):
 
 
 class Cleanup(webapp2.RequestHandler):
-
   """Stop instances."""
+
   @data_handler.data_required
   def post(self):
     """Stop instances using the gce_appengine helper class."""

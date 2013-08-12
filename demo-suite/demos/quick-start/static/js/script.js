@@ -16,6 +16,7 @@ $(document).ready(function() {
  */
 var QuickStart = function() { };
 
+// Recovery mode flag, initialized to false.
 var Recovering = false;
 
 /**
@@ -30,23 +31,17 @@ QuickStart.prototype.initialize = function() {
     var numInstances = parseInt($('#num-instances').val(), 10);
     var currentInstances = data['stateCount']['TOTAL'];
     if (currentInstances != 0) {
-      // Alert user we're in recovery mode.
-      //if (numInstances == 0) {
-        //alert('Instances stopping, waiting for completion');
-      //} else {
-        //alert('Instances starting, waiting for completion');
-      //}
-
-      // Instance are already running so we're in recovery mode. To draw 
-      // grid, maintain counter, and start status polling, we simulate 
-      // start click with running current number of instances requested.
-      // We also set Recovering flag to true to inhibit sending of start 
-      // request to GCE. 
+      // Instance are already running so we're in recovery mode. Calculate 
+      // current elapsed time and set timer element accordingly.
       var startTime = parseInt($('#start-time').val(), 10);
       var currentTime = Math.round(new Date().getTime() / 1000)
       var elapsedTime = currentTime - startTime;
       Timer.prototype.setOffset(elapsedTime);
 
+      // In order to draw grid, maintain counter and timer, and start 
+      // status polling, we simulate start click with current number of 
+      // instances requested, but we set Recovering flag to true to 
+      // inhibit sending of start request to GCE.
       $('#num-instances').val(currentInstances);
       Recovering = true;
       $('#start').click();
