@@ -44,6 +44,11 @@ class Objective(ndb.Model):
   # request or 0 for a reset/stop request.
   targetVMs = ndb.IntegerProperty()
 
+  # Number of VMs started by last start request. This is handy when
+  # recovering during a reset operation, so we can figure out how many 
+  # instances to depict in the UI.
+  startedVMs = ndb.IntegerProperty()
+
   # Epoch time when last/current request was stated.
   startTime = ndb.IntegerProperty()
 
@@ -59,6 +64,9 @@ def updateObjective(project_id, targetVMs):
     key = ndb.Key("Objective", project_id)
     objective = Objective(key=key)
   objective.targetVMs = targetVMs
+  # Overwrite startedVMs only when starting, skip when stopping.
+  if targetVMs > 0:
+    objective.startedVMs = targetVMs 
   objective.startTime = int(time.time())
   objective.put()
 
@@ -83,16 +91,19 @@ class QuickStart(webapp2.RequestHandler):
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
 
     targetVMs = 0
+    startedVMs = 0
     startTime = 0
 
     gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
     objective = getObjective(gce_project_id)
     if objective:
-      (targetVMs, startTime) = (objective.targetVMs, objective.startTime)
+      (targetVMs, startedVMs, startTime) = (objective.targetVMs, 
+        objective.startedVMs, objective.startTime)
 
     variables = {
       'demo_name': DEMO_NAME,
       'targetVMs': targetVMs,
+      'startedVMs': startedVMs,
       'startTime': startTime
     }
     template = jinja_environment.get_template(

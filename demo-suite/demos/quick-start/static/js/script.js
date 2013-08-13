@@ -29,6 +29,7 @@ QuickStart.prototype.initialize = function() {
 
   gce.getInstanceStates(function(data) {
     var numInstances = parseInt($('#num-instances').val(), 10);
+    var startedInstances = parseInt($('#started-instances').val(), 10);
     var currentInstances = data['stateCount']['TOTAL'];
     if (currentInstances != 0) {
       // Instance are already running so we're in recovery mode. Calculate 
@@ -39,12 +40,10 @@ QuickStart.prototype.initialize = function() {
       Timer.prototype.setOffset(elapsedTime);
 
       // In order to draw grid, maintain counter and timer, and start 
-      // status polling, we simulate start click with current number of 
-      // instances requested, but we set Recovering flag to true to 
-      // inhibit sending of start request to GCE.
-      if (numInstances == 0) {
-        $('#num-instances').val(currentInstances);
-      }
+      // status polling, we simulate start click with number of instances 
+      // last started, but we set Recovering flag to true to inhibit 
+      // sending of start request to GCE.
+      $('#num-instances').val(startedInstances);
       Recovering = true;
       $('#start').click();
       Recovering = false;
