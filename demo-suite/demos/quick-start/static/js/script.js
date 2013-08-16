@@ -46,9 +46,6 @@ QuickStart.prototype.initialize = function() {
       $('#num-instances').val(startedInstances);
       Recovering = true;
       $('#start').click();
-      if (numInstances == 0) {
-        $('#reset').click();
-      }
       $('#num-instances').val(numInstances);
 
       // In recovery mode, resets are ok but don't let user resend start,

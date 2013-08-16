@@ -266,10 +266,11 @@ Gce.prototype.heartbeat_ = function(numInstances, callback, terminalState) {
   var that = this;
   if (Recovering) {
     that.getStatuses_(success);
+  } else {
+    setTimeout(function() {
+      that.getStatuses_(success);
+    }, this.HEARTBEAT_TIMEOUT_);
   }
-  setTimeout(function() {
-    that.getStatuses_(success);
-  }, this.HEARTBEAT_TIMEOUT_);
 };
 
 Gce.prototype.continuousHeartbeat_ = function(callback) {
