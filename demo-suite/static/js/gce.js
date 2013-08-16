@@ -135,7 +135,7 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     }
   }
 
-  if (!Recovering) {
+  if ((typeof Recovering != undefined) && (!Recovering)) {
     var ajaxRequest = {
       type: 'POST',
       url: this.startInstanceUrl_,
@@ -264,7 +264,7 @@ Gce.prototype.heartbeat_ = function(numInstances, callback, terminalState) {
   // is complete), start the polling immediately to refresh state ASAP,
   // instead of waiting 2s to refresh the display.
   var that = this;
-  if (Recovering) {
+  if ((typeof Recovering != undefined) && (!Recovering)) {
     that.getStatuses_(success);
   } else {
     setTimeout(function() {
