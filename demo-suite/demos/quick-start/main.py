@@ -90,7 +90,7 @@ class QuickStart(webapp2.RequestHandler):
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
 
-    targetVMs = 0
+    targetVMs = 5
     startedVMs = 0
     startTime = 0
 

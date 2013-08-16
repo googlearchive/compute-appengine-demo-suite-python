@@ -46,7 +46,9 @@ QuickStart.prototype.initialize = function() {
       $('#num-instances').val(startedInstances);
       Recovering = true;
       $('#start').click();
-      Recovering = false;
+      if (numInstances == 0) {
+        $('#reset').click();
+      }
       $('#num-instances').val(numInstances);
 
       // In recovery mode, resets are ok but don't let user resend start,
@@ -77,8 +79,8 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
       alert('Max instances is 1000, starting 1000 instead.');
       numInstances = 1000;
     } else if (numInstances < 0) {
-      alert('At least one instance needs to be started, starting 1 instead.');
-      numInstances = 1;
+      alert('At least one instance needs to be started.');
+      return;
     } else if (numInstances === 0) {
       return;
     }
@@ -106,6 +108,9 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
       data: {'num_instances': numInstances},
       callback: function() {
         $('#reset').removeClass('disabled');
+        if (Recovering) {
+          Recovering = false;
+        }
       }
     });
   });
@@ -117,6 +122,9 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
     gce.stopInstances(function() {
       $('#start').removeClass('disabled');
       $('#reset').addClass('disabled');
+      if (Recovering) {
+        Recovering = false;
+      }
     });
   });
 };
