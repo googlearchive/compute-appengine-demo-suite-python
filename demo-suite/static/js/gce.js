@@ -135,7 +135,7 @@ Gce.prototype.startInstances = function(numInstances, startOptions) {
     }
   }
 
-  if ((typeof Recovering != undefined) && (!Recovering)) {
+  if ((typeof Recovering !== 'undefined') && (!Recovering)) {
     var ajaxRequest = {
       type: 'POST',
       url: this.startInstanceUrl_,
