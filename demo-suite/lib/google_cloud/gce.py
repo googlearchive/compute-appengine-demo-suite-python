@@ -602,7 +602,7 @@ class Instance(GceResource):
 
     self.name = json_resource['name']
     self.zone_name = Zone(json_resource['zone'].split('/')[-1])
-    self.machine_type = MachineType(json_resource['machineType'].split('/')[-1])
+    self.machine_type = MachineType(json_resource['machineType'].split('/')[-1],                                    self.zone_name)
     self.network_interfaces = json_resource['networkInterfaces']
     if json_resource.get('description', None):
       self.description = json_resource['description']
@@ -967,6 +967,7 @@ class MachineType(GceResource):
 
     super(MachineType, self).__init__('machineType', 'zonal')
     self.name = name
+    self.zone = Zone(zone_name)
 
   def service_resource(self):
     """Return the machineTypes method of apiclient.discovery.Resource object.
@@ -977,6 +978,13 @@ class MachineType(GceResource):
 
     return self.gce_project.service.machineTypes()
 
+  def set_defaults(self):
+    """Set any defaults before insert."""
+    if not self.name:
+      self.name = self.gce_project.settings['compute']['machine_type']
+    self.zone.gce_project = self.gce_project
+    if not self.zone.name:
+      self.zone.set_defaults()
 
 class Zone(GceResource):
   """A class representing a GCE Zone resource.
