@@ -602,7 +602,8 @@ class Instance(GceResource):
 
     self.name = json_resource['name']
     self.zone_name = Zone(json_resource['zone'].split('/')[-1])
-    self.machine_type = MachineType(json_resource['machineType'].split('/')[-1],                                    self.zone_name)
+    self.machine_type = MachineType(json_resource['machineType'].split('/')[-1],
+                                    self.zone_name)
     self.network_interfaces = json_resource['networkInterfaces']
     if json_resource.get('description', None):
       self.description = json_resource['description']
