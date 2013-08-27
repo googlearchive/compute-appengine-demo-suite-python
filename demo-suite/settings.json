@@ -3,7 +3,7 @@
     "compute": {
         "api_version": "v1beta15",
         "image": "centos-6-v20130515",
-        "kernel": "https://www.googleapis.com/compute/v1beta14/projects/google/global/kernels/gce-v20130515",
+        "kernel": "https://www.googleapis.com/compute/v1beta15/projects/google/global/kernels/gce-v20130515",
         "machine_type": "n1-standard-1",
         "zone": "us-central2-a",
         "network": "default",

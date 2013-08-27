@@ -422,10 +422,7 @@ class GceResource(object):
     """Set any defaults."""
 
     if not self.name:
-      if self.type == 'machineType':
-        self.name = self.gce_project.settings['compute']['machine_type']
-      else:
-        self.name = self.gce_project.settings['compute'][self.type]
+      self.name = self.gce_project.settings['compute'][self.type]
 
 class DiskMount(object):
   """A class for mounting options of a disk into a VM.
@@ -561,7 +558,7 @@ class Instance(GceResource):
     else:
       self.image = None
     self.kernel = kernel
-    self.machine_type = MachineType(machine_type_name)
+    self.machine_type = MachineType(machine_type_name, zone_name)
     self.network_interfaces = network_interfaces
     self.disk_mounts = disk_mounts or []
     self.metadata = metadata
@@ -961,14 +958,14 @@ class MachineType(GceResource):
     name: The string name of the machine type.
   """
 
-  def __init__(self, name=None):
+  def __init__(self, name=None, zone_name=None):
     """Initialize the MachineType class.
 
     Args:
       name: The string name of the machine type.
     """
 
-    super(MachineType, self).__init__('machineType', 'global')
+    super(MachineType, self).__init__('machineType', 'zonal')
     self.name = name
 
   def service_resource(self):
