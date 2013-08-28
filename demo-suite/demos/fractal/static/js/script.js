@@ -28,7 +28,7 @@ $(document).ready(function() {
   fractalCluster = new Fractal($('#fractalCluster'), CLUSTER_INSTANCE_TAG,
     NUM_CLUSTER_INSTANCES_START);
   fractalCluster.initialize();
-  fractal1 = new Fractal($('#fractal1'), SIGNLE_INSTANCE_TAG,
+  fractal1 = new Fractal($('#fractal1'), SINGLE_INSTANCE_TAG,
     1, fractalCluster);
   fractal1.initialize();
 
@@ -62,7 +62,7 @@ $(document).ready(function() {
  * @type {string}
  * @constant
  */
-var SIGNLE_INSTANCE_TAG = 'single';
+var SINGLE_INSTANCE_TAG = 'single';
 
 /**
  * Number of instances to start with in the cluster.
