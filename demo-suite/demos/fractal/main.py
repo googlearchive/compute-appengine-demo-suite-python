@@ -141,6 +141,7 @@ class Fractal(webapp2.RequestHandler):
         gce_project.list_instances,
         'Error listing instances: ',
         filter='name eq ^%s-.*' % self.instance_prefix())
+    logging.info(str(instances))
 
     # A map of instanceName -> (ip, RPC)
     health_rpcs = {}
