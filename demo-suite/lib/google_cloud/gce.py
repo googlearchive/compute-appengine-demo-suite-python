@@ -37,6 +37,7 @@ API = 'compute'
 GCE_URL = 'https://www.googleapis.com/%s' % API
 GOOGLE_PROJECT = 'centos-cloud'
 
+#logging.getLogger().setLevel(logging.WARNING)
 
 class GceProject(object):
   """Gce classes and methods to work with Compute Engine.
@@ -79,8 +80,8 @@ class GceProject(object):
     # Ability to build API from a local discovery doc is disabled here,
     # by commenting out code. We're not removing the code altogether, 
     # in case we ever want to revert to using a local discovery doc.
-    #discovery_doc_path = 'discovery/compute/%s.json' % api_version
-    #discovery_doc = open(discovery_doc_path, 'r').read()
+    discovery_doc_path = 'discovery/compute/%s.json' % api_version
+    discovery_doc = open(discovery_doc_path, 'r').read()
 
     auth_http = self._auth_http(credentials)
     #self.service = discovery.build_from_document(
