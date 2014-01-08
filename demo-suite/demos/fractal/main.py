@@ -48,16 +48,12 @@ GO_PROGRAM = os.path.join(VM_FILES, 'mandelbrot.go')
 GO_ARGS = '--portBase=80 --numPorts=1'
 GO_TILESERVER_FLAG = '--tileServers='
 
-# TODO: Update these values with your project and LB IP/destinations.
-LB_PROJECTS = {
-  'your-project': ['a.b.c.d'],
-}
-
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
 parameters = [
     user_data.DEFAULTS[user_data.GCE_PROJECT_ID],
-    user_data.DEFAULTS[user_data.GCE_ZONE_NAME]
+    user_data.DEFAULTS[user_data.GCE_ZONE_NAME],
+    user_data.DEFAULTS[user_data.GCE_LOAD_BALANCER_IP],
 ]
 data_handler = user_data.DataHandler(DEMO_NAME, parameters)
 
@@ -119,10 +115,13 @@ class Fractal(webapp2.RequestHandler):
 
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
-    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    data = data_handler.stored_user_data
+    gce_project_id = data[user_data.GCE_PROJECT_ID]
+    gce_load_balancer_ip = data.get(user_data.GCE_LOAD_BALANCER_IP, None)
     self.response.out.write(template.render({
       'demo_name': DEMO_NAME,
-      'lb_enabled': gce_project_id in LB_PROJECTS,
+      'lb_enabled': bool(gce_load_balancer_ip),
+      'lb_ip': gce_load_balancer_ip,
     }))
 
   @oauth_decorator.oauth_required
@@ -305,7 +304,8 @@ class Fractal(webapp2.RequestHandler):
         self, gce_project, self.instance_prefix())
 
   def _get_lb_servers(self, gce_project):
-    return LB_PROJECTS.get(gce_project.project_id, [])
+    data = data_handler.stored_user_data
+    return data.get(user_data.GCE_LOAD_BALANCER_IP, [])
 
   def instance_prefix(self):
     """Return a prefix based on a request/query params."""
