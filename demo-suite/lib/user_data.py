@@ -30,6 +30,7 @@ jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 
 GCE_PROJECT_ID = 'gce-project-id'
 GCE_ZONE_NAME = 'gce-zone-name'
+GCE_LOAD_BALANCER_IP = 'gce-load-balancer-ip'
 GCS_PROJECT_ID = 'gcs-project-id'
 GCS_BUCKET = 'gcs-bucket'
 GCS_DIRECTORY = 'gcs-directory'
@@ -45,6 +46,12 @@ DEFAULTS = {
         'required': True,
         'label': 'Compute Engine Zone (e.g.: us-central2-a)',
         'name': GCE_ZONE_NAME
+    },
+    GCE_LOAD_BALANCER_IP: {
+        'type': 'list',
+        'required': False,
+        'label': 'Compute Engine Load Balancer public IP address(s) (e.g.: 1.2.3.4,2.2.2.2)',
+        'name': 'gce-load-balancer-ip'
     },
     GCS_PROJECT_ID: {
         'type': 'string',
@@ -288,8 +295,18 @@ class DataHandler(object):
     variables = {'demo_name': self._demo_name}
     variables['user_entered'] = {}
     if user_data:
-      for data in user_data.user_data:
-        variables['user_entered'][data] = user_data.user_data[data]
+      data = user_data.user_data
+      # Convert 'list' typed user-data to a comma separated string
+      # for easier user editing e.g. a,b vs. ['a', 'b'].
+      for parameter in self._parameters:
+        name = parameter['name']
+        if parameter['type'] == 'list':
+          if name in data:
+            data[name] = ','.join(data[name])
+      # Copy all saved values into the output.
+      for name in user_data.user_data:
+        variables['user_entered'][name] = data[name]
+
     variables['parameters'] = self._parameters
 
     template = jinja_environment.get_template('templates/project.html')
@@ -316,6 +333,9 @@ class DataHandler(object):
       entered_value = request.get(data['name'])
       if not entered_value and data['required']:
         webapp2.redirect(URL_PATH)
+      if data['type'] == 'list':
+        # Convert string to list by spliting on commas and stripping whitespace.
+        entered_value = [v.strip() for v in entered_value.split(',')]
       new_user_data[data['name']] = entered_value
 
     if user_data:
