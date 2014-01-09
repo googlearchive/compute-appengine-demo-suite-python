@@ -117,11 +117,11 @@ class Fractal(webapp2.RequestHandler):
         'demos/%s/templates/index.html' % DEMO_NAME)
     data = data_handler.stored_user_data
     gce_project_id = data[user_data.GCE_PROJECT_ID]
-    gce_load_balancer_ip = data.get(user_data.GCE_LOAD_BALANCER_IP, None)
+    gce_load_balancer_ip = self._get_lb_servers()
     self.response.out.write(template.render({
       'demo_name': DEMO_NAME,
       'lb_enabled': bool(gce_load_balancer_ip),
-      'lb_ip': gce_load_balancer_ip,
+      'lb_ip': ', '.join(gce_load_balancer_ip),
     }))
 
   @oauth_decorator.oauth_required
@@ -178,7 +178,7 @@ class Fractal(webapp2.RequestHandler):
     loadbalancers = []
     lb_rpcs = {}
     if instances and len(instances) > 1:
-      loadbalancers = self._get_lb_servers(gce_project)
+      loadbalancers = self._get_lb_servers()
     if num_running > 0 and loadbalancers:
       for lb in loadbalancers:
         health_url = 'http://%s/health?t=%d' % (lb, int(time.time()))
@@ -303,7 +303,7 @@ class Fractal(webapp2.RequestHandler):
     gce_appengine.GceAppEngine().delete_demo_instances(
         self, gce_project, self.instance_prefix())
 
-  def _get_lb_servers(self, gce_project):
+  def _get_lb_servers(self):
     data = data_handler.stored_user_data
     return data.get(user_data.GCE_LOAD_BALANCER_IP, [])
 
@@ -372,7 +372,7 @@ class Fractal(webapp2.RequestHandler):
     if instance_names:
       tile_servers = ''
       if len(instance_names) > 1:
-        tile_servers = self._get_lb_servers(gce_project)
+        tile_servers = self._get_lb_servers()
       if not tile_servers:
         tile_servers = instance_names
       tile_servers = ','.join(tile_servers)

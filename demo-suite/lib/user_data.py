@@ -296,13 +296,14 @@ class DataHandler(object):
     variables['user_entered'] = {}
     if user_data:
       data = user_data.user_data
-      # for list typed parameters, convert to a comma separated string for user editing
+      # Convert 'list' typed user-data to a comma separated string
+      # for easier user editing e.g. a,b vs. ['a', 'b'].
       for parameter in self._parameters:
         name = parameter['name']
         if parameter['type'] == 'list':
           if name in data:
             data[name] = ','.join(data[name])
-      # copy all saved values into the output
+      # Copy all saved values into the output.
       for name in user_data.user_data:
         variables['user_entered'][name] = data[name]
 
@@ -333,7 +334,7 @@ class DataHandler(object):
       if not entered_value and data['required']:
         webapp2.redirect(URL_PATH)
       if data['type'] == 'list':
-        # convert string to list by spliting on commas and striping whitespace
+        # Convert string to list by spliting on commas and stripping whitespace.
         entered_value = [v.strip() for v in entered_value.split(',')]
       new_user_data[data['name']] = entered_value
 
