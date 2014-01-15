@@ -77,9 +77,9 @@ QuickStart.prototype.initializeButtons_ = function(gce) {
   $('#start').click(function() {
     // Get the number of instances entered by the user.
     var numInstances = parseInt($('#num-instances').val(), 10);
-    if (numInstances > 10000) {
-      alert('Max instances is 10000, starting 10000 instead.');
-      numInstances = 10000;
+    if (numInstances > 1000) {
+      alert('Max instances is 1000, starting 1000 instead.');
+      numInstances = 1000;
     } else if (numInstances < 0) {
       alert('At least one instance needs to be started.');
       return;
