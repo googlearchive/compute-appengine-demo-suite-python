@@ -657,11 +657,6 @@ class Instance(GceResource):
           'accessConfigs': self.gce_project.settings[
               'compute']['access_configs']
       }]
-    if self.name == 'quick-start-0':
-      self.network_interfaces[0]['accessConfigs'] = [{
-            'name': 'External IP access config',
-            'type': 'ONE_TO_ONE_NAT'}]
-
     boot_from_pd = False
     for d in self.disk_mounts:
       d.set_gce_project(self.gce_project)
