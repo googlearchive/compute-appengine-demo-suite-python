@@ -48,16 +48,12 @@ GO_PROGRAM = os.path.join(VM_FILES, 'mandelbrot.go')
 GO_ARGS = '--portBase=80 --numPorts=1'
 GO_TILESERVER_FLAG = '--tileServers='
 
-# TODO: Update these values with your project and LB IP/destinations.
-LB_PROJECTS = {
-  'your-project': ['a.b.c.d'],
-}
-
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
 parameters = [
     user_data.DEFAULTS[user_data.GCE_PROJECT_ID],
-    user_data.DEFAULTS[user_data.GCE_ZONE_NAME]
+    user_data.DEFAULTS[user_data.GCE_ZONE_NAME],
+    user_data.DEFAULTS[user_data.GCE_LOAD_BALANCER_IP],
 ]
 data_handler = user_data.DataHandler(DEMO_NAME, parameters)
 
@@ -119,10 +115,13 @@ class Fractal(webapp2.RequestHandler):
 
     template = jinja_environment.get_template(
         'demos/%s/templates/index.html' % DEMO_NAME)
-    gce_project_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
+    data = data_handler.stored_user_data
+    gce_project_id = data[user_data.GCE_PROJECT_ID]
+    gce_load_balancer_ip = self._get_lb_servers()
     self.response.out.write(template.render({
       'demo_name': DEMO_NAME,
-      'lb_enabled': gce_project_id in LB_PROJECTS,
+      'lb_enabled': bool(gce_load_balancer_ip),
+      'lb_ip': ', '.join(gce_load_balancer_ip),
     }))
 
   @oauth_decorator.oauth_required
@@ -179,7 +178,7 @@ class Fractal(webapp2.RequestHandler):
     loadbalancers = []
     lb_rpcs = {}
     if instances and len(instances) > 1:
-      loadbalancers = self._get_lb_servers(gce_project)
+      loadbalancers = self._get_lb_servers()
     if num_running > 0 and loadbalancers:
       for lb in loadbalancers:
         health_url = 'http://%s/health?t=%d' % (lb, int(time.time()))
@@ -304,8 +303,9 @@ class Fractal(webapp2.RequestHandler):
     gce_appengine.GceAppEngine().delete_demo_instances(
         self, gce_project, self.instance_prefix())
 
-  def _get_lb_servers(self, gce_project):
-    return LB_PROJECTS.get(gce_project.project_id, [])
+  def _get_lb_servers(self):
+    data = data_handler.stored_user_data
+    return data.get(user_data.GCE_LOAD_BALANCER_IP, [])
 
   def instance_prefix(self):
     """Return a prefix based on a request/query params."""
@@ -372,7 +372,7 @@ class Fractal(webapp2.RequestHandler):
     if instance_names:
       tile_servers = ''
       if len(instance_names) > 1:
-        tile_servers = self._get_lb_servers(gce_project)
+        tile_servers = self._get_lb_servers()
       if not tile_servers:
         tile_servers = instance_names
       tile_servers = ','.join(tile_servers)

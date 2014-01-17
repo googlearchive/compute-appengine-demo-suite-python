@@ -28,7 +28,7 @@ var DEMO_NAME = '{{ demo_name }}';
   <div class="span5">
     <h2>Instance Cluster
     {% if lb_enabled %}
-      <small>using load balancer<span> <i id="lbsOk" class="icon-ok-sign" style="visibility: hidden"> </i></small>
+    <small title="{{ lb_ip }}">using load balancer <span> <i id="lbsOk" class="icon-ok-sign" style="visibility: hidden"> </i></small>
     {% else %}
       <small>direct connect</small>
     {% endif %}
