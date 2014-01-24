@@ -146,10 +146,13 @@ class Instance(webapp2.RequestHandler):
     # external IP address. We will apply this configuration to the first
     # VM started by quick start. All other VMs will take the default
     # network configuration, which requests no external IP address.
-    ext_net = [ { 'name': 'External IP access config',
-                                 'type': 'ONE_TO_ONE_NAT'
-                } ]
-
+    network = gce.Network('default')
+    network.gce_project = gce_project
+    ext_net = [{ 'network': network.url,
+                 'accessConfigs': [{ 'name': 'External IP access config',
+                                     'type': 'ONE_TO_ONE_NAT'
+                                   }] 
+               }]
     num_instances = int(self.request.get('num_instances'))
     instances = [ gce.Instance('%s-%d' % (DEMO_NAME, i), 
                                zone_name=gce_zone_name,
