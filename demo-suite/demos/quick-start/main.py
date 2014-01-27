@@ -142,9 +142,22 @@ class Instance(webapp2.RequestHandler):
     gce_project = gce.GceProject(credentials, project_id=gce_project_id,
         zone_name=gce_zone_name)
 
+    # Define a network interfaces list here that requests an ephemeral
+    # external IP address. We will apply this configuration to the first
+    # VM started by quick start. All other VMs will take the default
+    # network configuration, which requests no external IP address.
+    network = gce.Network('default')
+    network.gce_project = gce_project
+    ext_net = [{ 'network': network.url,
+                 'accessConfigs': [{ 'name': 'External IP access config',
+                                     'type': 'ONE_TO_ONE_NAT'
+                                   }] 
+               }]
     num_instances = int(self.request.get('num_instances'))
-    instances = [gce.Instance('%s-%d' % (DEMO_NAME, i), zone_name=gce_zone_name)
-                 for i in range(num_instances)]
+    instances = [ gce.Instance('%s-%d' % (DEMO_NAME, i), 
+                               zone_name=gce_zone_name,
+                               network_interfaces=(ext_net if i == 0 else None))
+                    for i in range(num_instances) ]
     response = gce_appengine.GceAppEngine().run_gce_request(
         self,
         gce_project.bulk_insert,

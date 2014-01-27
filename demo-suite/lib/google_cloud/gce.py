@@ -37,7 +37,6 @@ API = 'compute'
 GCE_URL = 'https://www.googleapis.com/%s' % API
 GOOGLE_PROJECT = 'centos-cloud'
 
-
 class GceProject(object):
   """Gce classes and methods to work with Compute Engine.
 
@@ -658,7 +657,6 @@ class Instance(GceResource):
           'accessConfigs': self.gce_project.settings[
               'compute']['access_configs']
       }]
-
     boot_from_pd = False
     for d in self.disk_mounts:
       d.set_gce_project(self.gce_project)

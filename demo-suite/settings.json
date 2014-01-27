@@ -7,9 +7,7 @@
         "machine_type": "n1-standard-1",
         "zone": "us-central2-a",
         "network": "default",
-        "access_configs": [{
-            "name": "External IP access config",
-            "type": "ONE_TO_ONE_NAT"}],
+        "access_configs": [],
         "firewall": {
             "allowed": [{"IPProtocol": "tcp", "ports": "80"}],
             "sourceRanges": ["0.0.0.0/0"]}
