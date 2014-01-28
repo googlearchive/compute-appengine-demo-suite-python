@@ -521,6 +521,9 @@ class Instance(GceResource):
         service accounts.
   """
 
+  # Static class var for caching references to client lib instances() method.
+  method_ref = None
+
   def __init__(self,
                name=None,
                zone_name=None,
@@ -657,6 +660,7 @@ class Instance(GceResource):
           'accessConfigs': self.gce_project.settings[
               'compute']['access_configs']
       }]
+
     boot_from_pd = False
     for d in self.disk_mounts:
       d.set_gce_project(self.gce_project)
@@ -680,7 +684,12 @@ class Instance(GceResource):
       The instances method of the apiclient.discovery.Resource object.
     """
 
-    return self.gce_project.service.instances()
+    # Obtain a method reference if we don't already have one. Otherwise, 
+    # reuse the one we've already obtained and cached in a static class 
+    # variable. This avoids significant real time delay.
+    if not Instance.method_ref:
+      Instance.method_ref = self.gce_project.service.instances()
+    return Instance.method_ref
 
 
 class Firewall(GceResource):
@@ -890,6 +899,9 @@ class Disk(GceResource):
     size_gb: The size of the disk in GB
   """
 
+  # Static class var for caching references to client lib disks() method.
+  method_ref = None
+
   def __init__(self,
                name=None,
                zone_name=None,
@@ -953,8 +965,12 @@ class Disk(GceResource):
       The disks method of the apiclient.discovery.Resource object.
     """
 
-    return self.gce_project.service.disks()
-
+    # Obtain a method reference if we don't already have one. Otherwise, 
+    # reuse the one we've already obtained and cached in a static class 
+    # variable. This avoids significant real time delay.
+    if not Disk.method_ref:
+      Disk.method_ref = self.gce_project.service.disks()
+    return Disk.method_ref
 
 class MachineType(GceResource):
   """A class representing a GCE Machine Type resource.
