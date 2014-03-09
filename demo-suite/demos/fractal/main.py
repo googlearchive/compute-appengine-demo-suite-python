@@ -422,6 +422,16 @@ class Fractal(webapp2.RequestHandler):
 
 
       gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
+      # Define a network interfaces list here that requests an ephemeral
+      # external IP address. We will apply this configuration to all VMs
+      # started by the fractal app. 
+      network = gce.Network('default')
+      network.gce_project = gce_project
+      ext_net = [{ 'network': network.url,
+                   'accessConfigs': [{ 'name': 'External IP access config',
+                                       'type': 'ONE_TO_ONE_NAT'
+                                     }]
+                 }]
       instance = gce.Instance(
           name=instance_name,
           machine_type_name=MACHINE_TYPE,
@@ -430,6 +440,7 @@ class Fractal(webapp2.RequestHandler):
           image_project_id=image_project_id,
           disk_mounts=disk_mounts,
           kernel=kernel,
+          network_interfaces=ext_net,
           tags=[DEMO_NAME, self.instance_prefix()],
           metadata=self._get_instance_metadata(gce_project, instance_names),
           service_accounts=gce_project.settings['cloud_service_account'])
