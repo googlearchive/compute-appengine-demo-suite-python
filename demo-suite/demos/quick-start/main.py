@@ -154,9 +154,16 @@ class Instance(webapp2.RequestHandler):
                                    }] 
                }]
     num_instances = int(self.request.get('num_instances'))
+    IMAGE = 'centos-6-v20131120'
+    GOOGLE_PROJECT = 'centos-cloud'
+    disk = gce.Disk()
+    image = gce.Image(IMAGE, GOOGLE_PROJECT)
     instances = [ gce.Instance('%s-%d' % (DEMO_NAME, i), 
                                zone_name=gce_zone_name,
-                               network_interfaces=(ext_net if i == 0 else None))
+                               network_interfaces=(ext_net if i == 0 else None),
+                               init_disk_name='%s-%d' % (DEMO_NAME, i),
+                               init_disk_size=10,
+                               init_disk_image=image)
                     for i in range(num_instances) ]
     response = gce_appengine.GceAppEngine().run_gce_request(
         self,
