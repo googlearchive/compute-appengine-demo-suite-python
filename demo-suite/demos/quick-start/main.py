@@ -154,7 +154,7 @@ class Instance(webapp2.RequestHandler):
                                    }] 
                }]
     num_instances = int(self.request.get('num_instances'))
-    IMAGE = 'centos-6-v20131120'
+    IMAGE = 'centos-6-v20140318'
     GOOGLE_PROJECT = 'centos-cloud'
     disk = gce.Disk()
     image = gce.Image(IMAGE, GOOGLE_PROJECT)
