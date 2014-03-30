@@ -512,7 +512,6 @@ class Instance(GceResource):
     description: A string description of the instance.
     tags: A list of string tags for the instance.
     image: An object of type Image representing the instance's image.
-    kernel: The kernel resource to boot from.
     machine_type: An object of type MachineType representing the instance's
         machine type.
     network_interfaces: A list of dictionaries representing the instance's
@@ -536,7 +535,6 @@ class Instance(GceResource):
                tags=None,
                image_name=None,
                image_project_id=GOOGLE_PROJECT,
-               kernel=None,
                machine_type_name=None,
                network_interfaces=None,
                disk_mounts=None,
@@ -552,7 +550,6 @@ class Instance(GceResource):
       zone_name: The string name of the zone.
       description: The string description of the instance.
       tags: A list of string tags for the instance.
-      kernel: The kernel resource to boot from.
       machine_type_name: A string name of the machine type.
       network_interfaces: A list of dictionaries representing the instance's
           network interfaces.
@@ -570,7 +567,6 @@ class Instance(GceResource):
     self.zone = Zone(zone_name)
     self.description = description
     self.tags = tags
-    self.kernel = kernel
     self.machine_type = MachineType(machine_type_name, zone_name)
     self.network_interfaces = network_interfaces
     self.disk_mounts = disk_mounts or []
@@ -599,8 +595,6 @@ class Instance(GceResource):
       instance['tags'] = {'items': self.tags}
     #if self.image:
         #instance['image'] = self.image.url,
-    if self.kernel:
-      instance['kernel'] = self.kernel
     if self.disk_mounts:
       instance['disks'] = [m.json for m in self.disk_mounts]
     if self.metadata:
@@ -637,8 +631,6 @@ class Instance(GceResource):
     if json_resource.get('tags', None):
       if json_resource['tags'].get('items', None):
         self.tags = json_resource['tags']['items']
-    if json_resource.get('kernel', None):
-      self.kernel = json_resource['kernel']
     if json_resource.get('status', None):
       self.status = json_resource['status']
     if json_resource.get('statusMessage', None):
