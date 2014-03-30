@@ -437,6 +437,12 @@ class DiskMount(object):
     disk: A disk resource for persistent disk.
     device_name: A unique device name.
     boot: Is this a boot disk?
+    source: Fully qualified URI to root persistent disk.
+    name: Name to use for auto-created root PD.
+    size: Size (in GBs) for auto-created root PD.
+    image: Source image name for auto-created root PD.
+    project: Project associated with auto-created root PD's source image.
+    auto_delete: Whether auto-created root PD should be auto-deleted when VM is deleted.
   """
 
   def __init__(self,
@@ -444,7 +450,13 @@ class DiskMount(object):
                mode='READ_WRITE',
                disk=None,
                device_name=None,
-               boot=False):
+               boot=True,
+               source=None,
+               name=None,
+               size=None,
+               image=None,
+               project=None,
+               auto_delete=True):
     """Initialize the DiskMount class."""
     self.mount_type = mount_type
     self.mode = mode
@@ -454,6 +466,12 @@ class DiskMount(object):
       self.disk = None
     self.device_name = device_name
     self.boot = boot
+    self.source = source
+    self.name = name
+    self.size = size
+    self.image = image
+    self.project = project
+    self.auto_delete = auto_delete
 
   @property
   def json(self):
@@ -466,16 +484,26 @@ class DiskMount(object):
     mount = {
         'type': self.mount_type,
         'mode': self.mode,
-        'boot': self.boot
+        'boot': self.boot,
+        'autoDelete': self.auto_delete,
+        'initializeParams' : {}
     }
     if self.disk:
       mount['source'] = self.disk.url
     if self.device_name:
       mount['deviceName'] = self.device_name
+    if self.name:
+      mount['initializeParams']['diskName'] = self.name
+    if self.size:
+      mount['initializeParams']['diskSizeGb'] = self.size
+    if self.image and self.project:
+      image = Image(self.image, self.project)
+      image.gce_project = self.gce_project
+      mount['initializeParams']['sourceImage'] = image.url
     return mount
 
   def from_json(self, json_resource):
-    """Sets member variables from a dictionary representing an disk mount.
+    """Sets member variables from a dictionary representing a disk mount.
 
     Args:
       json_resource: A dictionary representing the disk mount.
@@ -487,18 +515,32 @@ class DiskMount(object):
       self.mode = json_resource['mode']
     if json_resource.get('boot'):
       self.boot = json_resource['boot']
+    if json_resource.get('autoDelete'):
+      self.auto_delete= json_resource['autoDelete']
     if json_resource.get('source'):
       self.disk = Disk(json_resource['source'].split('/')[-1])
     if json_resource.get('device_name'):
       self.device_name = json_resource('deviceName')
+    if json_resource.get('initializeParams'):
+      if json_resource['initializeParams'].get('diskName'):
+        self.name = json_resource['initializeParams']['diskName']
+      if json_resource['initializeParams'].get('diskSizeGb'):
+        self.size = json_resource['initializeParams']['diskSizeGb']
+      if json_resource['initializeParams'].get('sourceImage'):
+        self.image = json_resource['initializeParams']['sourceImage']
 
   def set_defaults(self):
     """Set any defaults before insert."""
     if self.disk and not self.disk.name:
       self.disk.set_defaults()
+    if not self.image:
+      self.image = self.gce_project.settings['compute']['image']
+    if not self.project:
+      self.project = self.gce_project.settings['compute']['image_project']
 
   def set_gce_project(self, gce_project):
     """Set the GceProject into this object."""
+    self.gce_project = gce_project
     if self.disk:
       self.disk.gce_project = gce_project
 
@@ -520,9 +562,6 @@ class Instance(GceResource):
     metadata: A list of dictionaries representing the instance's metadata.
     service_accounts: A list of dictionaries representing the instance's
         service accounts.
-    init_disk_name: Name for auto-created disk.
-    init_disk_size: Size (in GB) for auto-created disk.
-    init_disk_image: Image object for auto-created disk.
   """
 
   # Static class var for caching references to client lib instances() method.
@@ -539,10 +578,7 @@ class Instance(GceResource):
                network_interfaces=None,
                disk_mounts=None,
                metadata=None,
-               service_accounts=None,
-               init_disk_name=None,
-               init_disk_size=None,
-               init_disk_image=None):
+               service_accounts=None):
     """Initializes the Instance class.
 
     Args:
@@ -557,9 +593,6 @@ class Instance(GceResource):
       metadata: A list of dictionaries representing the instance's metadata.
       service_accounts: A list of dictionaries representing the instance's
           service accounts.
-      init_disk_name: Name for auto-created disk.
-      init_disk_size: Size (in GB) for auto-created disk.
-      init_disk_image: Image object for auto-created disk.
     """
 
     super(Instance, self).__init__('instance', 'zonal')
@@ -572,9 +605,6 @@ class Instance(GceResource):
     self.disk_mounts = disk_mounts or []
     self.metadata = metadata
     self.service_accounts = service_accounts
-    self.init_disk_name = init_disk_name
-    self.init_disk_size = init_disk_size
-    self.init_disk_image = init_disk_image
 
   @property
   def json(self):
@@ -601,17 +631,6 @@ class Instance(GceResource):
       instance['metadata'] = {'items': self.metadata}
     if self.service_accounts:
       instance['serviceAccounts'] = self.service_accounts
-    if self.init_disk_name:
-      instance['disks'] = [{}]
-      instance['disks'][0]['type'] = 'PERSISTENT'
-      instance['disks'][0]['boot'] = True
-      instance['disks'][0]['autoDelete'] = True
-      instance['disks'][0]['initializeParams'] = {}
-      instance['disks'][0]['initializeParams']['diskName'] = self.init_disk_name
-    if self.init_disk_size:
-      instance['disks'][0]['initializeParams']['diskSizeGb'] = self.init_disk_size
-    if self.init_disk_image:
-      instance['disks'][0]['initializeParams']['sourceImage'] = self.init_disk_image.url
     return instance
 
   def from_json(self, json_resource):
@@ -647,13 +666,6 @@ class Instance(GceResource):
         self.metadata = json_resource['metadata']['items']
     if json_resource.get('serviceAccounts', None):
       self.service_accounts = json_resource['serviceAccounts']
-    if json_resource.get('initializeParams.diskName'):
-      self.init_disk_name = json_resource('initializeParams.diskName')
-    if json_resource.get('initializeParams.diskSizeGb'):
-      self.init_disk_size = json_resource('initializeParams.diskSizeGb')
-    if json_resource.get('initializeParams.sourceImage', None):
-      #BUG: Need to get the zone out of the image too
-      self.init_disk_image = Image(json_resource['initializeParams.sourceImage'].split('/')[-1])
 
   def set_defaults(self):
     """Set any defaults before insert."""
@@ -676,21 +688,9 @@ class Instance(GceResource):
               'compute']['access_configs']
       }]
 
-    boot_from_pd = False
     for d in self.disk_mounts:
       d.set_gce_project(self.gce_project)
       d.set_defaults()
-      if d.boot:
-        boot_from_pd = True
-
-    # If we aren't booting from PD and we don't have an image, fix that up now.
-    #if not boot_from_pd and self.image == None:
-      #self.image = Image(None, GOOGLE_PROJECT)
-
-    if self.init_disk_image:
-      self.init_disk_image.gce_project = self.gce_project
-      #if not self.image.name:
-        #self.image.set_defaults()
 
   def service_resource(self):
     """Return the instances method of the apiclient.discovery.Resource object.

@@ -3,6 +3,7 @@
     "compute": {
         "api_version": "v1",
         "image": "centos-6-v20140318",
+        "image_project": "centos-cloud",
         "machine_type": "n1-standard-1",
         "zone": "us-central2-a",
         "network": "default",
