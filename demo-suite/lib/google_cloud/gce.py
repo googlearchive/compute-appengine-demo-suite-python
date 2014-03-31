@@ -623,8 +623,6 @@ class Instance(GceResource):
       instance['description'] = self.description
     if self.tags:
       instance['tags'] = {'items': self.tags}
-    #if self.image:
-        #instance['image'] = self.image.url,
     if self.disk_mounts:
       instance['disks'] = [m.json for m in self.disk_mounts]
     if self.metadata:
