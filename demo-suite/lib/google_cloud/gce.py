@@ -438,7 +438,7 @@ class DiskMount(object):
     device_name: A unique device name.
     boot: Is this a boot disk?
     source: Fully qualified URI to root persistent disk.
-      NOTE: source is mututally exclusive with name/size/image/project. The former
+      NOTE: source is mututally exclusive with init_disk_*. The former
       requests the VM be setup to use an existing PD and the latter requests
       creation of a new PD.
     init_disk_name: Name to use for auto-created root PD.
