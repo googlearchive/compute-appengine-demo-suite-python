@@ -486,12 +486,13 @@ class DiskMount(object):
         'mode': self.mode,
         'boot': self.boot,
         'autoDelete': self.auto_delete,
-        'initializeParams' : {}
     }
     if self.disk:
       mount['source'] = self.disk.url
     if self.device_name:
       mount['deviceName'] = self.device_name
+    if self.name or self.size or self.image or self.project:
+      mount['initializeParams'] = {}
     if self.name:
       mount['initializeParams']['diskName'] = self.name
     if self.size:
@@ -500,6 +501,7 @@ class DiskMount(object):
       image = Image(self.image, self.project)
       image.gce_project = self.gce_project
       mount['initializeParams']['sourceImage'] = image.url
+    logging.info('mount: ' + json.dumps(mount))
     return mount
 
   def from_json(self, json_resource):
@@ -533,10 +535,11 @@ class DiskMount(object):
     """Set any defaults before insert."""
     if self.disk and not self.disk.name:
       self.disk.set_defaults()
-    if not self.image:
-      self.image = self.gce_project.settings['compute']['image']
-    if not self.project:
-      self.project = self.gce_project.settings['compute']['image_project']
+    if not self.disk:
+      if not self.image:
+        self.image = self.gce_project.settings['compute']['image']
+      if not self.project:
+        self.project = self.gce_project.settings['compute']['image_project']
 
   def set_gce_project(self, gce_project):
     """Set the GceProject into this object."""
@@ -572,8 +575,6 @@ class Instance(GceResource):
                zone_name=None,
                description=None,
                tags=None,
-               image_name=None,
-               image_project_id=GOOGLE_PROJECT,
                machine_type_name=None,
                network_interfaces=None,
                disk_mounts=None,
