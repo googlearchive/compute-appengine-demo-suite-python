@@ -438,10 +438,13 @@ class DiskMount(object):
     device_name: A unique device name.
     boot: Is this a boot disk?
     source: Fully qualified URI to root persistent disk.
-    name: Name to use for auto-created root PD.
-    size: Size (in GBs) for auto-created root PD.
-    image: Source image name for auto-created root PD.
-    project: Project associated with auto-created root PD's source image.
+      NOTE: source is mututally exclusive with name/size/image/project. The former
+      requests the VM be setup to use an existing PD and the latter requests
+      creation of a new PD.
+    init_disk_name: Name to use for auto-created root PD.
+    init_disk_size: Size (in GBs) for auto-created root PD.
+    init_disk_image: Source image name for auto-created root PD.
+    init_disk_project: Project associated with auto-created root PD's source image.
     auto_delete: Whether auto-created root PD should be auto-deleted when VM is deleted.
   """
 
@@ -452,10 +455,10 @@ class DiskMount(object):
                device_name=None,
                boot=False,
                source=None,
-               name=None,
-               size=None,
-               image=None,
-               project=None,
+               init_disk_name=None,
+               init_disk_size=None,
+               init_disk_image=None,
+               init_disk_project=None,
                auto_delete=True):
     """Initialize the DiskMount class."""
     self.mount_type = mount_type
@@ -467,10 +470,10 @@ class DiskMount(object):
     self.device_name = device_name
     self.boot = boot
     self.source = source
-    self.name = name
-    self.size = size
-    self.image = image
-    self.project = project
+    self.init_disk_name = init_disk_name
+    self.init_disk_size = init_disk_size
+    self.init_disk_image = init_disk_image
+    self.init_disk_project = init_disk_project
     self.auto_delete = auto_delete
 
   @property
@@ -491,14 +494,15 @@ class DiskMount(object):
       mount['source'] = self.disk.url
     if self.device_name:
       mount['deviceName'] = self.device_name
-    if self.name or self.size or self.image or self.project:
+    if self.init_disk_name or self.init_disk_size or self.init_disk_image or \
+        self.init_disk_project:
       mount['initializeParams'] = {}
-    if self.name:
-      mount['initializeParams']['diskName'] = self.name
-    if self.size:
-      mount['initializeParams']['diskSizeGb'] = self.size
-    if self.image and self.project:
-      image = Image(self.image, self.project)
+    if self.init_disk_name:
+      mount['initializeParams']['diskName'] = self.init_disk_name
+    if self.init_disk_size:
+      mount['initializeParams']['diskSizeGb'] = self.init_disk_size
+    if self.init_disk_image and self.init_disk_project:
+      image = Image(self.init_disk_image, self.init_disk_project)
       image.gce_project = self.gce_project
       mount['initializeParams']['sourceImage'] = image.url
     logging.info('mount: ' + json.dumps(mount))
@@ -525,21 +529,21 @@ class DiskMount(object):
       self.device_name = json_resource('deviceName')
     if json_resource.get('initializeParams'):
       if json_resource['initializeParams'].get('diskName'):
-        self.name = json_resource['initializeParams']['diskName']
+        self.init_disk_name = json_resource['initializeParams']['diskName']
       if json_resource['initializeParams'].get('diskSizeGb'):
-        self.size = json_resource['initializeParams']['diskSizeGb']
+        self.init_disk_size = json_resource['initializeParams']['diskSizeGb']
       if json_resource['initializeParams'].get('sourceImage'):
-        self.image = json_resource['initializeParams']['sourceImage']
+        self.init_disk_image = json_resource['initializeParams']['sourceImage']
 
   def set_defaults(self):
     """Set any defaults before insert."""
     if self.disk and not self.disk.name:
       self.disk.set_defaults()
     if not self.disk:
-      if not self.image:
-        self.image = self.gce_project.settings['compute']['image']
-      if not self.project:
-        self.project = self.gce_project.settings['compute']['image_project']
+      if not self.init_disk_image:
+        self.init_disk_image = self.gce_project.settings['compute']['image']
+      if not self.init_disk_project:
+        self.init_disk_project = self.gce_project.settings['compute']['image_project']
 
   def set_gce_project(self, gce_project):
     """Set the GceProject into this object."""
