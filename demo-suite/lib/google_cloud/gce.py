@@ -450,7 +450,7 @@ class DiskMount(object):
                mode='READ_WRITE',
                disk=None,
                device_name=None,
-               boot=True,
+               boot=False,
                source=None,
                name=None,
                size=None,
