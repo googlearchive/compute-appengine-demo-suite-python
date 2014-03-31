@@ -157,7 +157,8 @@ class Instance(webapp2.RequestHandler):
     instances = [ gce.Instance('%s-%d' % (DEMO_NAME, i), 
                                zone_name=gce_zone_name,
                                network_interfaces=(ext_net if i == 0 else None),
-                               disk_mounts=[gce.DiskMount(name='%s-%d' % (DEMO_NAME, i))])
+                               disk_mounts=[gce.DiskMount(name='%s-%d' % (DEMO_NAME, i),
+                                                          boot=True)])
                     for i in range(num_instances) ]
     response = gce_appengine.GceAppEngine().run_gce_request(
         self,
