@@ -408,18 +408,7 @@ class Fractal(webapp2.RequestHandler):
     instance_list = []
     for instance_name in instance_names:
       disk_name = 'boot-%s' % instance_name
-      disk = disks.get(disk_name, None)
-      disk_mounts = []
-      image_project_id = None
-      image_name = None
-      kernel = None
-      if disk:
-        dm = gce.DiskMount(disk=disk, boot=True)
-        kernel = gce_project.settings['compute']['kernel']
-        disk_mounts.append(dm)
-      else:
-        image_project_id, image_name = image
-
+      disk_mounts = [gce.DiskMount(init_disk_name=disk_name, boot=True, auto_delete=True)]
 
       gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
       # Define a network interfaces list here that requests an ephemeral
@@ -436,11 +425,8 @@ class Fractal(webapp2.RequestHandler):
           name=instance_name,
           machine_type_name=MACHINE_TYPE,
           zone_name=gce_zone_name,
-          image_name=image_name,
-          image_project_id=image_project_id,
-          disk_mounts=disk_mounts,
-          kernel=kernel,
           network_interfaces=ext_net,
+          disk_mounts=disk_mounts,
           tags=[DEMO_NAME, self.instance_prefix()],
           metadata=self._get_instance_metadata(gce_project, instance_names),
           service_accounts=gce_project.settings['cloud_service_account'])

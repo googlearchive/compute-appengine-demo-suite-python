@@ -437,6 +437,15 @@ class DiskMount(object):
     disk: A disk resource for persistent disk.
     device_name: A unique device name.
     boot: Is this a boot disk?
+    source: Fully qualified URI to root persistent disk.
+      NOTE: source is mututally exclusive with init_disk_*. The former
+      requests the VM be setup to use an existing PD and the latter requests
+      creation of a new PD.
+    init_disk_name: Name to use for auto-created root PD.
+    init_disk_size: Size (in GBs) for auto-created root PD.
+    init_disk_image: Source image name for auto-created root PD.
+    init_disk_project: Project associated with auto-created root PD's source image.
+    auto_delete: Whether auto-created root PD should be auto-deleted when VM is deleted.
   """
 
   def __init__(self,
@@ -444,16 +453,28 @@ class DiskMount(object):
                mode='READ_WRITE',
                disk=None,
                device_name=None,
-               boot=False):
+               boot=False,
+               source=None,
+               init_disk_name=None,
+               init_disk_size=None,
+               init_disk_image=None,
+               init_disk_project=None,
+               auto_delete=True):
     """Initialize the DiskMount class."""
     self.mount_type = mount_type
     self.mode = mode
     if type(disk) is Disk:
       self.disk = disk
     else:
-      self.disk = Disk(disk)
+      self.disk = None
     self.device_name = device_name
     self.boot = boot
+    self.source = source
+    self.init_disk_name = init_disk_name
+    self.init_disk_size = init_disk_size
+    self.init_disk_image = init_disk_image
+    self.init_disk_project = init_disk_project
+    self.auto_delete = auto_delete
 
   @property
   def json(self):
@@ -466,37 +487,67 @@ class DiskMount(object):
     mount = {
         'type': self.mount_type,
         'mode': self.mode,
-        'boot': self.boot
+        'boot': self.boot,
+        'autoDelete': self.auto_delete,
     }
     if self.disk:
       mount['source'] = self.disk.url
     if self.device_name:
       mount['deviceName'] = self.device_name
+    if self.init_disk_name or self.init_disk_size or self.init_disk_image or \
+        self.init_disk_project:
+      mount['initializeParams'] = {}
+    if self.init_disk_name:
+      mount['initializeParams']['diskName'] = self.init_disk_name
+    if self.init_disk_size:
+      mount['initializeParams']['diskSizeGb'] = self.init_disk_size
+    if self.init_disk_image and self.init_disk_project:
+      image = Image(self.init_disk_image, self.init_disk_project)
+      image.gce_project = self.gce_project
+      mount['initializeParams']['sourceImage'] = image.url
+    logging.info('mount: ' + json.dumps(mount))
     return mount
 
   def from_json(self, json_resource):
-    """Sets member variables from a dictionary representing an disk mount.
+    """Sets member variables from a dictionary representing a disk mount.
 
     Args:
       json_resource: A dictionary representing the disk mount.
     """
 
-    self.mount_type = json_resource['type']
-    self.mode = json_resource['mode']
+    if json_resource.get('type'):
+      self.mount_type = json_resource['type']
+    if json_resource.get('mode'):
+      self.mode = json_resource['mode']
     if json_resource.get('boot'):
       self.boot = json_resource['boot']
+    if json_resource.get('autoDelete'):
+      self.auto_delete= json_resource['autoDelete']
     if json_resource.get('source'):
       self.disk = Disk(json_resource['source'].split('/')[-1])
     if json_resource.get('device_name'):
       self.device_name = json_resource('deviceName')
+    if json_resource.get('initializeParams'):
+      if json_resource['initializeParams'].get('diskName'):
+        self.init_disk_name = json_resource['initializeParams']['diskName']
+      if json_resource['initializeParams'].get('diskSizeGb'):
+        self.init_disk_size = json_resource['initializeParams']['diskSizeGb']
+      if json_resource['initializeParams'].get('sourceImage'):
+        self.init_disk_image = json_resource['initializeParams']['sourceImage']
 
   def set_defaults(self):
     """Set any defaults before insert."""
     if self.disk and not self.disk.name:
       self.disk.set_defaults()
+    if not self.disk:
+      if not self.init_disk_image:
+        self.init_disk_image = self.gce_project.settings['compute']['image']
+      if not self.init_disk_project:
+        self.init_disk_project = self.gce_project.settings['compute']['image_project']
 
   def set_gce_project(self, gce_project):
     """Set the GceProject into this object."""
+    self.gce_project = gce_project
     if self.disk:
       self.disk.gce_project = gce_project
 
@@ -510,7 +561,6 @@ class Instance(GceResource):
     description: A string description of the instance.
     tags: A list of string tags for the instance.
     image: An object of type Image representing the instance's image.
-    kernel: The kernel resource to boot from.
     machine_type: An object of type MachineType representing the instance's
         machine type.
     network_interfaces: A list of dictionaries representing the instance's
@@ -529,9 +579,6 @@ class Instance(GceResource):
                zone_name=None,
                description=None,
                tags=None,
-               image_name=None,
-               image_project_id=GOOGLE_PROJECT,
-               kernel=None,
                machine_type_name=None,
                network_interfaces=None,
                disk_mounts=None,
@@ -544,9 +591,6 @@ class Instance(GceResource):
       zone_name: The string name of the zone.
       description: The string description of the instance.
       tags: A list of string tags for the instance.
-      image_name: A string name of the image.
-      image_project: The string name of the project owning the image.
-      kernel: The kernel resource to boot from.
       machine_type_name: A string name of the machine type.
       network_interfaces: A list of dictionaries representing the instance's
           network interfaces.
@@ -561,11 +605,6 @@ class Instance(GceResource):
     self.zone = Zone(zone_name)
     self.description = description
     self.tags = tags
-    if image_name:
-      self.image = Image(image_name, image_project_id)
-    else:
-      self.image = None
-    self.kernel = kernel
     self.machine_type = MachineType(machine_type_name, zone_name)
     self.network_interfaces = network_interfaces
     self.disk_mounts = disk_mounts or []
@@ -589,10 +628,6 @@ class Instance(GceResource):
       instance['description'] = self.description
     if self.tags:
       instance['tags'] = {'items': self.tags}
-    if self.image:
-        instance['image'] = self.image.url,
-    if self.kernel:
-      instance['kernel'] = self.kernel
     if self.disk_mounts:
       instance['disks'] = [m.json for m in self.disk_mounts]
     if self.metadata:
@@ -618,11 +653,6 @@ class Instance(GceResource):
     if json_resource.get('tags', None):
       if json_resource['tags'].get('items', None):
         self.tags = json_resource['tags']['items']
-    if json_resource.get('image', None):
-      #BUG: Need to get the zone out of the image too
-      self.image = Image(json_resource['image'].split('/')[-1])
-    if json_resource.get('kernel', None):
-      self.kernel = json_resource['kernel']
     if json_resource.get('status', None):
       self.status = json_resource['status']
     if json_resource.get('statusMessage', None):
@@ -661,21 +691,9 @@ class Instance(GceResource):
               'compute']['access_configs']
       }]
 
-    boot_from_pd = False
     for d in self.disk_mounts:
       d.set_gce_project(self.gce_project)
       d.set_defaults()
-      if d.boot:
-        boot_from_pd = True
-
-    # If we aren't booting from PD and we don't have an image, fix that up now.
-    if not boot_from_pd and self.image == None:
-      self.image = Image(None, GOOGLE_PROJECT)
-
-    if self.image:
-      self.image.gce_project = self.gce_project
-      if not self.image.name:
-        self.image.set_defaults()
 
   def service_resource(self):
     """Return the instances method of the apiclient.discovery.Resource object.
