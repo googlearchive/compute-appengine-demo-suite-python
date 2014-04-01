@@ -411,6 +411,9 @@ class Fractal(webapp2.RequestHandler):
       disk_mounts = [gce.DiskMount(init_disk_name=disk_name, boot=True, auto_delete=True)]
 
       gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
+      # Define a network interfaces list here that requests an ephemeral
+      # external IP address. We will apply this configuration to all VMs
+      # started by the fractal app. 
       network = gce.Network('default')
       network.gce_project = gce_project
       ext_net = [{ 'network': network.url,
