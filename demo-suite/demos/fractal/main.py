@@ -408,16 +408,7 @@ class Fractal(webapp2.RequestHandler):
     instance_list = []
     for instance_name in instance_names:
       disk_name = 'boot-%s' % instance_name
-      disk = disks.get(disk_name, None)
-      disk_mounts = []
-      image_project_id = None
-      image_name = None
-      if disk:
-        dm = gce.DiskMount(disk=disk, boot=True, auto_delete=False)
-        disk_mounts.append(dm)
-      else:
-        image_project_id, image_name = image
-
+      disk_mounts = [gce.DiskMount(init_disk_name=disk_name, boot=True, auto_delete=True)]
 
       gce_zone_name = data_handler.stored_user_data[user_data.GCE_ZONE_NAME]
       network = gce.Network('default')
