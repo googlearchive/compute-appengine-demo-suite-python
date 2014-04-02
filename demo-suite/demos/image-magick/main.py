@@ -123,11 +123,14 @@ class Instance(webapp2.RequestHandler):
     num_instances = int(self.request.get('num_instances'))
     for i in range(num_instances):
       startup_script = os.path.join(os.path.dirname(__file__), 'startup.sh')
+      instance_name='%s-%d' % (DEMO_NAME, i)
       instances.append(gce.Instance(
-          name='%s-%d' % (DEMO_NAME, i),
-          image_project_id=image_project,
-          image_name=image_name,
+          name=instance_name,
           service_accounts=gce_project.settings['cloud_service_account'],
+          disk_mounts=[gce.DiskMount(boot=True, init_disk_name=instance_name,
+                             #init_disk_image=image_name, 
+                             #init_disk_project=image_project,
+                             auto_delete=True)],
           metadata=[
               {'key': 'startup-script', 'value': open(
                   startup_script, 'r').read()},
