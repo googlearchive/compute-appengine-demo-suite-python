@@ -167,7 +167,7 @@ class Instance(webapp2.RequestHandler):
     Returns:
       A tuple containing the image project and image name.
     """
-    if gce_project.list_images(filter='name eq ^%s$' % IMAGE):
+    if gce_project.list_images(filter='name eq ' + IMAGE):
       return (gce_project.project_id, IMAGE)
     return (None, None)
 
