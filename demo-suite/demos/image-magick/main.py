@@ -132,7 +132,8 @@ class Instance(webapp2.RequestHandler):
       startup_script = os.path.join(os.path.dirname(__file__), 'startup.sh')
       instance_name='%s-%d' % (DEMO_NAME, i)
       instances.append(gce.Instance(
-          name=instance_name, network_interfaces=ext_net,
+          name=instance_name, 
+          network_interfaces=ext_net,
           service_accounts=gce_project.settings['cloud_service_account'],
           disk_mounts=[gce.DiskMount(boot=True, 
                                      init_disk_name=instance_name,
