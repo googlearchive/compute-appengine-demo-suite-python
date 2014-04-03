@@ -121,13 +121,25 @@ class Instance(webapp2.RequestHandler):
     # Create a list of instances to insert.
     instances = []
     num_instances = int(self.request.get('num_instances'))
+    network = gce.Network('default')
+    network.gce_project = gce_project
+    ext_net = [{'network': network.url,
+                'accessConfigs': [{'name': 'External IP access config',
+                                   'type': 'ONE_TO_ONE_NAT'
+                                  }]
+               }]
     for i in range(num_instances):
       startup_script = os.path.join(os.path.dirname(__file__), 'startup.sh')
+      instance_name='%s-%d' % (DEMO_NAME, i)
       instances.append(gce.Instance(
-          name='%s-%d' % (DEMO_NAME, i),
-          image_project_id=image_project,
-          image_name=image_name,
+          name=instance_name, 
+          network_interfaces=ext_net,
           service_accounts=gce_project.settings['cloud_service_account'],
+          disk_mounts=[gce.DiskMount(boot=True, 
+                                     init_disk_name=instance_name,
+                                     init_disk_image=image_name, 
+                                     init_disk_project=image_project,
+                                     auto_delete=True)],
           metadata=[
               {'key': 'startup-script', 'value': open(
                   startup_script, 'r').read()},
@@ -156,9 +168,9 @@ class Instance(webapp2.RequestHandler):
     Returns:
       A tuple containing the image project and image name.
     """
-    if gce_project.list_images(filter='name eq ^%s-$' % IMAGE):
+    if gce_project.list_images(filter='name eq ' + IMAGE):
       return (gce_project.project_id, IMAGE)
-    return ('google', None)
+    return (None, None)
 
 
 class GceCleanup(webapp2.RequestHandler):
