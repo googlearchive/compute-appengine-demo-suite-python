@@ -76,6 +76,24 @@ DEFAULTS = {
 
 URL_PATH = '/%s/project'
 
+STARTUP_SCRIPT = '''
+#!/bin/bash
+
+instances=""
+instance_hostname=`hostname`
+instance_prefix=${instance_hostname%%?}
+
+for (( i=1; i<%d; i++ ))
+do
+  instances+="$instance_prefix$i "
+done
+
+while sleep 10m
+do
+  gcutil deleteinstance $instances --force --delete_boot_pd
+  gcutil deleteinstance $instance_hostname --force --delete_boot_pd
+done
+'''
 
 class JsonProperty(db.Property):
   """JSON data stored in database.
