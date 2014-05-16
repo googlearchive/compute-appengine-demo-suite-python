@@ -124,6 +124,19 @@ class GceProject(object):
 
     return self._list(Firewall, **args)
 
+  def list_routes(self, **args):
+    """Lists all routes for a project.
+
+    Args represent any optional parameters for the list routes request.
+    See the API documentation:
+
+    https://developers.google.com/compute/docs/reference/v1/routes/list
+
+    Returns:
+      A list of Route objects.
+    """
+    return self._list(Route, **args)
+
   def list_images(self, **args):
     """Lists all images for a project.
 
@@ -583,7 +596,8 @@ class Instance(GceResource):
                network_interfaces=None,
                disk_mounts=None,
                metadata=None,
-               service_accounts=None):
+               service_accounts=None,
+               can_ip_forward=None):
     """Initializes the Instance class.
 
     Args:
@@ -598,6 +612,7 @@ class Instance(GceResource):
       metadata: A list of dictionaries representing the instance's metadata.
       service_accounts: A list of dictionaries representing the instance's
           service accounts.
+      can_ip_forward: Boolean enabling IP forwarding for instance
     """
 
     super(Instance, self).__init__('instance', 'zonal')
@@ -610,6 +625,7 @@ class Instance(GceResource):
     self.disk_mounts = disk_mounts or []
     self.metadata = metadata
     self.service_accounts = service_accounts
+    self.can_ip_forward = can_ip_forward
 
   @property
   def json(self):
@@ -634,6 +650,8 @@ class Instance(GceResource):
       instance['metadata'] = {'items': self.metadata}
     if self.service_accounts:
       instance['serviceAccounts'] = self.service_accounts
+    if self.can_ip_forward:
+      instance['canIpForward'] = True
     return instance
 
   def from_json(self, json_resource):
@@ -669,6 +687,8 @@ class Instance(GceResource):
         self.metadata = json_resource['metadata']['items']
     if json_resource.get('serviceAccounts', None):
       self.service_accounts = json_resource['serviceAccounts']
+    if json_resource.get('canIPForward', False):
+      self.can_ip_forward = json_resource['canIPForward']
 
   def set_defaults(self):
     """Set any defaults before insert."""
@@ -823,6 +843,115 @@ class Firewall(GceResource):
     """
 
     return self.gce_project.service.firewalls()
+
+
+class Route(GceResource):
+  """A class representing a GCE Route resource.
+
+  Attributes:
+    name: The string name of the firewall.
+    description: A string description of the firewall.
+    network: A Network object representing the network.
+    tags: A list of tags that indicate which instances this route 
+      will apply.
+    destination_range: The destination range of outgoing packets that this
+      route applies to.
+    priority: The priority of this route.
+    next_hop_instance: The fully-qualified URL to an instance that should
+      handle matching packets.
+  """
+
+  def __init__(self,
+               name=None,
+               description=None,
+               destination_range=None,
+               network_name=None,
+               priority=1000,
+               tags=None,
+               next_hop_instance=None):
+    """Initialize the Firewall class.
+
+    Args:
+      name: The string name of the network to add the firewall.
+      description: A string description of the firewall.
+      network_name: The name of the network.
+      tags: A list of tags that indicate which instances this route 
+        will apply.
+      destination_range: The destination range of outgoing packets that this
+        route applies to.
+      priority: The priority of this route.
+      next_hop_instance: A Instance object representing a next hop instance.
+    """
+
+    super(Route, self).__init__('route', 'global')
+    if name:
+      self.name = name
+      self.description = description
+      self.network = Network(network_name)
+      self.destination_range = destination_range
+      self.priority = priority
+      self.tags = tags
+      self.next_hop_instance = next_hop_instance.url
+
+
+  @property
+  def json(self):
+    """Create a json representation of the resource.
+
+    Returns:
+      A dictionary representing the resource.
+    """
+
+    route = {
+        'name': self.name,
+        'network': self.network.url
+    }
+    if self.destination_range:
+      route['destRange'] = self.destination_range
+    if self.tags:
+      route['tags'] = self.tags
+    if self.next_hop_instance:
+      route['nextHopInstance'] = self.next_hop_instance
+    if self.priority:
+      route['priority'] = self.priority
+    return route
+
+  def from_json(self, json_resource):
+    """Sets member variables from a dictionary representing a firewall.
+
+    Args:
+      json_resource: A dictionary representing the firewall.
+    """
+
+    self.name = json_resource['name']
+    self.network = Network('default')
+    if json_resource.get('destRange', None):
+      self.destination_range = json_resource['destRange']
+    if json_resource.get('tags', None):
+      self.tags = json_resource['tags']
+    if json_resource.get('priority', None):
+      self.source_tags = json_resource['priority']
+    if json_resource.get('nextHopInstance', None):
+      self.next_hop_instance = json_resource['nextHopInstance']
+
+
+  def set_defaults(self):
+    """Set any defaults before insert."""
+
+    self.network.gce_project = self.gce_project
+
+    if not self.network.name:
+      self.network.set_defaults()
+
+  def service_resource(self):
+    """Return the routes method of the apiclient.discovery.Resource object.
+
+    Returns:
+      The routes method of the apiclient.discovery.Resource object.
+    """
+
+    return self.gce_project.service.routes()
+
 
 
 class Image(GceResource):

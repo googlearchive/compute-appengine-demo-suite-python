@@ -79,19 +79,23 @@ URL_PATH = '/%s/project'
 STARTUP_SCRIPT = '''
 #!/bin/bash
 
-instances=""
-instance_hostname=`hostname`
-instance_prefix=${instance_hostname%%?}
+no_ip=%s
 
-for (( i=1; i<%d; i++ ))
-do
-  instances+="$instance_prefix$i "
-done
+if $no_ip; then
+  sleep_time=5m
+else
+  sleep_time=15m
+  sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+  sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+fi
 
-while sleep 10m
+while sleep $sleep_time
 do
-  gcutil deleteinstance $instances --force --delete_boot_pd
-  gcutil deleteinstance $instance_hostname --force --delete_boot_pd
+  if ! $no_ip; then
+    gcutil deleteroute `hostname` --force
+  fi
+  
+  gcutil deleteinstance `hostname` --force --delete_boot_pd
 done
 '''
 

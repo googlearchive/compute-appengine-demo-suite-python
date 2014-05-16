@@ -71,8 +71,13 @@ def updateObjective(project_id, targetVMs):
   objective.put()
 
 def getUserDemoInfo(user):
+  try:
+    ldap = user.nickname().split('@')[0]
+  except:
+    ldap = 'unknown'
+    logging.info('User without a nicname')
+
   gce_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
-  ldap = user.nickname().split('@')[0]
   demo_id = '%s-%s' % (DEMO_NAME, ldap)
   project_id = '%s-%s' % (gce_id, ldap)
 
@@ -153,6 +158,26 @@ class Instance(webapp2.RequestHandler):
     gce_project = gce.GceProject(credentials, project_id=gce_project_id,
         zone_name=gce_zone_name)
 
+    # Create a user specific route. We will apply this route to all 
+    # instances without an IP address so their requests are routed
+    # through the first instance acting as a proxy. 
+    # gce_project.list_routes()
+    proxy_instance = gce.Instance(name='%s-0' % user_info['demo_id'],
+                                  zone_name=gce_zone_name)
+    proxy_instance.gce_project = gce_project
+    route_name = '%s-0' % user_info['demo_id']
+    gce_route = gce.Route(name=route_name,
+                          network_name='default',
+                          destination_range='0.0.0.0/0',
+                          priority=200,
+                          next_hop_instance=proxy_instance,
+                          tags=['qs-%s' % user_info['ldap']])
+    response = gce_appengine.GceAppEngine().run_gce_request(
+        self,
+        gce_project.insert,
+        'Error inserting route: ',
+        resource=gce_route)
+
     # Define a network interfaces list here that requests an ephemeral
     # external IP address. We will apply this configuration to the first
     # VM started by quick start. All other VMs will take the default
@@ -169,13 +194,18 @@ class Instance(webapp2.RequestHandler):
                                zone_name=gce_zone_name,
                                network_interfaces=(ext_net if i == 0 else None),
                                metadata=([{
-                                 'key': 'startup-script', 
-                                 'value': user_data.STARTUP_SCRIPT % num_instances
-                                 }] if i==0 else None),
+                                    'key': 'startup-script', 
+                                    'value': user_data.STARTUP_SCRIPT % 'false'
+                                 }] if i==0 else [{
+                                    'key': 'startup-script',
+                                    'value': user_data.STARTUP_SCRIPT % 'true'
+                                 }]),
                                service_accounts=[{'email': 'default', 
                                  'scopes': ['https://www.googleapis.com/auth/compute']}],
                                disk_mounts=[gce.DiskMount(
-                                 init_disk_name='%s-%d' % (user_info['demo_id'], i), boot=True)])
+                                 init_disk_name='%s-%d' % (user_info['demo_id'], i), boot=True)],
+                               can_ip_forward=(True if i == 0 else False),
+                               tags=(['qs-proxy'] if i == 0 else ['qs-%s' % user_info['ldap']]))
                     for i in range(num_instances) ]
     response = gce_appengine.GceAppEngine().run_gce_request(
         self,
@@ -210,6 +240,9 @@ class Cleanup(webapp2.RequestHandler):
 
     # Record reset objective in datastore so we can recover work in progress.
     updateObjective(user_info['project_id'], 0)
+
+    gce_appengine.GceAppEngine().delete_demo_route(
+        self, gce_project, '%s-0' % user_info['demo_id'])
 
 app = webapp2.WSGIApplication(
     [
