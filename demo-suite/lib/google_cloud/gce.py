@@ -852,35 +852,35 @@ class Route(GceResource):
     name: The string name of the firewall.
     description: A string description of the firewall.
     network: A Network object representing the network.
-    tags: A list of tags that indicate which instances this route 
-      will apply.
     destination_range: The destination range of outgoing packets that this
       route applies to.
     priority: The priority of this route.
     next_hop_instance: The fully-qualified URL to an instance that should
       handle matching packets.
+    tags: A list of tags that indicate which instances this route 
+      will apply.
   """
 
   def __init__(self,
                name=None,
                description=None,
-               destination_range=None,
                network_name=None,
+               destination_range=None,
+               next_hop_instance=None,
                priority=1000,
-               tags=None,
-               next_hop_instance=None):
+               tags=None):
     """Initialize the Firewall class.
 
     Args:
       name: The string name of the network to add the firewall.
       description: A string description of the firewall.
       network_name: The name of the network.
-      tags: A list of tags that indicate which instances this route 
-        will apply.
       destination_range: The destination range of outgoing packets that this
         route applies to.
-      priority: The priority of this route.
       next_hop_instance: A Instance object representing a next hop instance.
+      priority: The priority of this route.
+      tags: A list of tags that indicate which instances this route 
+        will apply.
     """
 
     super(Route, self).__init__('route', 'global')
@@ -889,9 +889,9 @@ class Route(GceResource):
       self.description = description
       self.network = Network(network_name)
       self.destination_range = destination_range
+      self.next_hop_instance = next_hop_instance.url
       self.priority = priority
       self.tags = tags
-      self.next_hop_instance = next_hop_instance.url
 
 
   @property

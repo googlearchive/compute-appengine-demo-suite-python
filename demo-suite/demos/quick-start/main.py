@@ -75,7 +75,7 @@ def getUserDemoInfo(user):
     ldap = user.nickname().split('@')[0]
   except:
     ldap = 'unknown'
-    logging.info('User without a nicname')
+    logging.info('User without a nickname')
 
   gce_id = data_handler.stored_user_data[user_data.GCE_PROJECT_ID]
   demo_id = '%s-%s' % (DEMO_NAME, ldap)
@@ -169,8 +169,8 @@ class Instance(webapp2.RequestHandler):
     gce_route = gce.Route(name=route_name,
                           network_name='default',
                           destination_range='0.0.0.0/0',
-                          priority=200,
                           next_hop_instance=proxy_instance,
+                          priority=200,
                           tags=['qs-%s' % user_info['ldap']])
     response = gce_appengine.GceAppEngine().run_gce_request(
         self,

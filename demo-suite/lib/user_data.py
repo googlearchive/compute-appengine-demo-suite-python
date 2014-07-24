@@ -82,9 +82,9 @@ STARTUP_SCRIPT = '''
 no_ip=%s
 
 if $no_ip; then
-  sleep_time=5m
+  sleep_time=10m
 else
-  sleep_time=15m
+  sleep_time=25m
   sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
   sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 fi
