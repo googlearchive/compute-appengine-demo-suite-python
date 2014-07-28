@@ -76,6 +76,28 @@ DEFAULTS = {
 
 URL_PATH = '/%s/project'
 
+STARTUP_SCRIPT = '''
+#!/bin/bash
+
+no_ip=%s
+
+if $no_ip; then
+  sleep_time=10m
+else
+  sleep_time=25m
+  sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+  sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+fi
+
+while sleep $sleep_time
+do
+  if ! $no_ip; then
+    gcutil deleteroute `hostname` --force
+  fi
+  
+  gcutil deleteinstance `hostname` --force --delete_boot_pd
+done
+'''
 
 class JsonProperty(db.Property):
   """JSON data stored in database.

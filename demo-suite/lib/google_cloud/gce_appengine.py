@@ -17,7 +17,9 @@
 import json
 import logging
 
+from google.appengine.api import users
 import gce_exception as error
+
 
 MAX_RESULTS = 100
 
@@ -83,6 +85,56 @@ class GceAppEngine(object):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('stopping cluster')
 
+  def list_demo_routes(self, request_handler, gce_project, route_name):
+    """Retrieves route list for the demo.
+
+    Sends the route list in the response as a JSON object
+
+    Args:
+      request_handler: An instance of webapp2.RequestHandler.
+      gce_project: An object of type gce.GceProject.
+      route_name: The string name of the route.
+    """
+
+    routes = self.run_gce_request(
+        request_handler,
+        gce_project.list_routes,
+        'Error listing routes: ',
+        filter='name eq ^%s$' % route_name,
+        maxResults = MAX_RESULTS)
+
+    return routes
+
+  def delete_demo_route(self, request_handler, gce_project, route_name):
+    """Deletes route for the demo.
+
+    First retrieves an route list with route name matching the demo
+    route. A bulk request is then sent to delete the resource.
+
+    Args:
+      request_handler: An instance of webapp2.RequestHandler.
+      gce_project: An object of type gce.GceProject.
+      route_name: The string name of the route.
+    """
+
+    routes = self.run_gce_request(
+        request_handler,
+        gce_project.list_routes,
+        'Error listing routes: ',
+        filter='name eq ^%s$' % route_name,
+        maxResults=MAX_RESULTS)
+
+    if routes:
+      response = self.run_gce_request(
+          request_handler,
+          gce_project.bulk_delete,
+          'Error deleting instances',
+          resources=routes)
+
+      if response:
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('Deleting route')
+
   def run_gce_request(self, request_handler, gce_method, error_message, **args):
     """Run a GCE Project list, insert, delete method.
 
@@ -106,6 +158,6 @@ class GceAppEngine(object):
       request_handler.response.set_status(500, error_message + e.message)
       return
     except error.GceTokenError:
-      request_handler.response.set_status(401, 'Unauthorized.')
+      request_handler.redirect(users.create_login_url(request_handler.uri))
       return
     return response

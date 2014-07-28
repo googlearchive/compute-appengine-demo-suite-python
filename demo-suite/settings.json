@@ -5,7 +5,7 @@
         "image": "debian-7-wheezy-v20140318",
         "image_project": "debian-cloud",
         "machine_type": "n1-standard-1",
-        "zone": "us-central1-a",
+        "zone": "us-central1-f",
         "network": "default",
         "access_configs": [],
         "firewall": {
